@@ -136,6 +136,10 @@ export interface Notitie {
   tekst: string;
   auteur: string;
   gemaakt?: Date;
+  /** Alleen gevuld als de notitie na het aanmaken is gewijzigd (FR-42). */
+  gewijzigd?: Date;
+  gewijzigdDoor?: string;
+  etag?: string;
 }
 
 export interface Statuswijziging {

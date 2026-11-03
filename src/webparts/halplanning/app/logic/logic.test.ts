@@ -1,8 +1,9 @@
 import { afsprakenVoorDemo, HELP_GEZOCHT, locatieTekst, plaatsItems, AgendaItem } from './agenda';
 import { naarGraphDatumTijd, vanGraphDatumTijd, vanInvoer, duurTekst } from './datum';
-import { allenBeantwoorden, parseAdressen, splitsCitaat, voegInNaBody, antwoordOnderwerp, naarTekst } from './mail';
+import { allenBeantwoorden, parseAdressen, splitsCitaat, voegInNaBody, antwoordOnderwerp, naarTekst, antwoordHtml } from './mail';
 import { formatteerIban, isGeldigeIban, isGeldigEmail } from './validatie';
-import { demoRijen, hulpGezocht, komendeDemos, urenPerBegeleider, demosPerType, matrix, RapportBron } from './rapportage';
+import { demoRijen, hulpGezocht, komendeDemos, urenPerBegeleider, demosPerType, matrix, RapportBron, borrelLabel, begeleiderNamen } from './rapportage';
+import { eersteDemoPerAanvraag, samenvoeging, sorteerAanvragen } from './aanvragen';
 import { Aanvraag, Begeleider, Demo } from '../model';
 
 describe('validatie', () => {
@@ -46,6 +47,11 @@ describe('datum', () => {
 });
 
 describe('mail', () => {
+  it('zet een witregel tussen tekst en handtekening', () => {
+    expect(antwoordHtml('<p>Hoi</p>', '<p>Groet</p>')).toBe('<div><p>Hoi</p><div><br></div><div class="halplanning-handtekening"><p>Groet</p></div></div>');
+    expect(antwoordHtml('<p>Hoi</p>', '')).toBe('<div><p>Hoi</p></div>');
+  });
+
   it('haalt adressen uit een tekst', () => {
     expect(parseAdressen('a@x.nl; Jan <B@y.nl>, a@x.nl')).toEqual(['a@x.nl', 'B@y.nl']);
     expect(parseAdressen('')).toEqual([]);
@@ -209,5 +215,56 @@ describe('rapportage', () => {
     const m = matrix(rijen, bron.begeleiders);
     expect(m.kolommen.map(k => k.naam)).toEqual(['Anna', 'Piet']);
     expect(m.cellen).toEqual([[60, 30], [undefined, 60]]);
+  });
+
+  it('toont begeleiders en een gewenste borrel', () => {
+    const rijen = demoRijen(bron);
+    expect(begeleiderNamen(rijen[0])).toBe('Anna, Piet');
+    expect(begeleiderNamen(rijen[1])).toBe('Piet');
+    expect(borrelLabel('geen')).toBe('');
+    expect(borrelLabel('onbekend')).toBe('');
+    expect(borrelLabel('vooraf')).toBe('borrel vooraf');
+    expect(borrelLabel('beide')).toBe('borrel vooraf en achteraf');
+    expect(borrelLabel('patat met snack achteraf')).toBe('patat met snack achteraf');
+  });
+});
+
+describe('aanvragen', () => {
+  const aanvraag = (id: number, status: Aanvraag['status'], bericht?: Date, extra: Partial<Aanvraag> = {}): Aanvraag => ({
+    id, titel: 'A' + id, naam: '', organisatie: '', email: '', telefoon: '', iban: '', status, onbeantwoord: false, bron: 'E-mail',
+    laatsteBerichtOp: bericht, ...extra
+  });
+  const lijst = [
+    aanvraag(1, 'Bevestigd', new Date(2026, 0, 3)),
+    aanvraag(2, 'Nieuw', new Date(2026, 0, 1)),
+    aanvraag(3, 'Nieuw', new Date(2026, 0, 2)),
+    aanvraag(4, 'In afwachting')
+  ];
+  const eerste = eersteDemoPerAanvraag([
+    { aanvraagId: 1, start: new Date(2026, 5, 9) },
+    { aanvraagId: 1, start: new Date(2026, 5, 2) },
+    { aanvraagId: 3, start: new Date(2026, 5, 5) }
+  ]);
+
+  it('bepaalt de eerste demo per aanvraag', () => {
+    expect(eerste[1]).toEqual(new Date(2026, 5, 2));
+    expect(eerste[2]).toBeUndefined();
+  });
+
+  it('sorteert op laatste bericht, eerste demo en status', () => {
+    expect(sorteerAanvragen(lijst, 'bericht', eerste).map(a => a.id)).toEqual([1, 3, 2, 4]);
+    expect(sorteerAanvragen(lijst, 'demo', eerste).map(a => a.id)).toEqual([1, 3, 2, 4]);
+    expect(sorteerAanvragen(lijst, 'status', eerste).map(a => a.id)).toEqual([3, 2, 4, 1]);
+    expect(lijst.map(a => a.id)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('vult bij samenvoegen lege gegevens aan en noemt afwijkende', () => {
+    const doel = aanvraag(1, 'Bevestigd', new Date(2026, 0, 1), { naam: 'Jan', email: 'jan@x.nl' });
+    const bron = aanvraag(2, 'Nieuw', new Date(2026, 0, 5), { titel: 'Vraag', naam: 'Jan', email: 'j@y.nl', telefoon: '06 1234', onbeantwoord: true });
+    const s = samenvoeging(doel, bron);
+    expect(s.wijziging).toEqual({ telefoon: '06 1234', onbeantwoord: true, laatsteBerichtOp: new Date(2026, 0, 5) });
+    expect(s.notitie).toContain('“Vraag”');
+    expect(s.notitie).toContain('E-mailadres: j@y.nl');
+    expect(s.notitie).not.toContain('Naam:');
   });
 });

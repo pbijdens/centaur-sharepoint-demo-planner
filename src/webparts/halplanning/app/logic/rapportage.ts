@@ -53,6 +53,31 @@ export function demoRijen(bron: RapportBron): DemoRij[] {
     });
 }
 
+/** Korte markering voor achter de titel als er een borrel gewenst is (FR-76); leeg bij "geen" of "onbekend". */
+export function borrelLabel(borrel: string): string {
+  switch (borrel) {
+    case 'vooraf':
+    case 'achteraf':
+      return 'borrel ' + borrel;
+    case 'beide':
+      return 'borrel vooraf en achteraf';
+    case 'geen':
+    case 'onbekend':
+    case '':
+      return '';
+    default:
+      return borrel;
+  }
+}
+
+/** Namen van de ingezette begeleiders, alfabetisch. */
+export function begeleiderNamen(rij: DemoRij): string {
+  return rij.begeleiders
+    .map(b => b.begeleider.naam)
+    .sort((a, b) => a.localeCompare(b, 'nl'))
+    .join(', ');
+}
+
 /** Demo's in [van, tot) die nog onvoldoende begeleiders hebben (FR-76). */
 export function hulpGezocht(rijen: DemoRij[], van: Date, tot: Date): DemoRij[] {
   return komendeDemos(rijen, van, tot).filter(r => !r.compleet);

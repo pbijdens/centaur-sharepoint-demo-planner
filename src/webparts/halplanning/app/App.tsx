@@ -209,7 +209,7 @@ function Hoofdscherm(): JSX.Element {
       </div>
 
       {scherm.s === 'lijst' && <AanvraagLijst open={id => setScherm({ s: 'aanvraag', id })} />}
-      {scherm.s === 'aanvraag' && <AanvraagDetail id={scherm.id} terug={naarLijst} />}
+      {scherm.s === 'aanvraag' && <AanvraagDetail id={scherm.id} terug={naarLijst} open={id => setScherm({ s: 'aanvraag', id })} />}
       {scherm.s === 'begeleiders' && <BeheerBegeleiders terug={naarLijst} />}
       {scherm.s === 'demotypes' && <BeheerDemoTypes terug={naarLijst} />}
       {scherm.s === 'standaardantwoorden' && <BeheerStandaardantwoorden terug={naarLijst} />}

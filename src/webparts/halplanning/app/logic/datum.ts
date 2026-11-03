@@ -81,6 +81,13 @@ export function tijdstipRelatief(d: Date, nu: Date = new Date()): string {
   return d.toLocaleDateString(nl, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+/** "12 nov 14:00"; buiten het huidige jaar "12 nov 2027 14:00". */
+export function datumTijdKort(d: Date, nu: Date = new Date()): string {
+  const opties: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
+  if (d.getFullYear() !== nu.getFullYear()) opties.year = 'numeric';
+  return d.toLocaleDateString(nl, opties) + ' ' + tijd(d);
+}
+
 export function datumTijd(d: Date): string {
   return datumKort(d) + ' ' + tijd(d);
 }

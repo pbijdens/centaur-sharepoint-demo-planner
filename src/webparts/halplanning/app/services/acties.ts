@@ -1,6 +1,7 @@
 // Samengestelde acties die SharePoint en Graph combineren.
 
 import { afsprakenVoorDemo, AfspraakSoort, AFSPRAAKSOORTEN } from '../logic/agenda';
+import { samenvoeging } from '../logic/aanvragen';
 import { antwoordHtml, parseAdressen } from '../logic/mail';
 import {
   Aanvraag,
@@ -224,6 +225,33 @@ export class Acties {
     const inkomend = (await this.repo.berichten(aanvraagId)).filter(b => b.richting === 'Inkomend' && b.ontvangenOp);
     const laatste = inkomend.reduce<Date | undefined>((max, b) => (!max || (b.ontvangenOp as Date) > max ? b.ontvangenOp : max), undefined);
     await this.repo.wijzigAanvraag(aanvraagId, { laatsteBerichtOp: laatste });
+  }
+
+  // ---- Samenvoegen ----
+
+  /**
+   * Voegt `bron` samen met de aanvraag `doelId` (FR-44): berichten, demo's (met inzet en afspraken), notities en
+   * geschiedenis gaan naar het doel, daarna gaat de bron naar de prullenbak. Eerst verplaatsen en pas als laatste
+   * verwijderen, zodat een onderbroken samenvoeging opnieuw gestart kan worden zonder iets kwijt te raken.
+   */
+  async voegSamen(bron: Aanvraag, doelId: number, voortgang?: (m: string) => void): Promise<void> {
+    if (bron.id === doelId) throw new Error('Een aanvraag kan niet met zichzelf worden samengevoegd.');
+    const melding = voortgang || ((): void => undefined);
+    const doel = await this.repo.aanvraag(doelId);
+    if (doel.status === 'Verwijderd') throw new Error('Samenvoegen met een verwijderde aanvraag kan niet.');
+    const { wijziging, notitie } = samenvoeging(doel, bron);
+
+    melding('Berichten en demo’s verplaatsen…');
+    await this.repo.verplaatsNaarAanvraag('berichten', bron.id, doelId);
+    await this.repo.verplaatsNaarAanvraag('demos', bron.id, doelId);
+    melding('Notities en geschiedenis verplaatsen…');
+    await this.repo.verplaatsNaarAanvraag('notities', bron.id, doelId);
+    await this.repo.verplaatsNaarAanvraag('statuswijzigingen', bron.id, doelId);
+
+    melding('Gegevens bijwerken…');
+    if (Object.keys(wijziging).length) await this.repo.wijzigAanvraag(doelId, wijziging, doel.etag);
+    await this.repo.maakNotitie(doelId, notitie);
+    await this.repo.verwijderAanvraag(bron.id);
   }
 
   // ---- Definitief verwijderen ----

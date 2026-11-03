@@ -114,9 +114,12 @@ export function escapeHtml(s: string): string {
     .replace(/'/g, '&#39;');
 }
 
-/** Opbouw van de HTML die verstuurd wordt: tekst van de agent + handtekening. */
+/**
+ * Opbouw van de HTML die verstuurd wordt: tekst van de agent + witregel + handtekening (FR-34).
+ * De witregel is een lege regel zoals Outlook die zelf maakt; marges worden door sommige mailprogramma's genegeerd.
+ */
 export function antwoordHtml(tekstHtml: string, handtekeningHtml: string): string {
-  const handtekening = handtekeningHtml ? '<div class="halplanning-handtekening">' + handtekeningHtml + '</div>' : '';
+  const handtekening = handtekeningHtml ? '<div><br></div><div class="halplanning-handtekening">' + handtekeningHtml + '</div>' : '';
   return '<div>' + tekstHtml + handtekening + '</div>';
 }
 

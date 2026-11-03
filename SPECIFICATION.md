@@ -92,13 +92,15 @@ De SharePoint-lijsten worden benaderd met de eigen SharePoint-rechten van de geb
 
 | ID | Eis |
 |---|---|
-| FR-10 | Het startscherm toont een lijst van aanvragen, gesorteerd op `LaatsteBerichtOp` (nieuwste eerst). Dat is het moment waarop het laatste **inkomende** bericht binnenkwam; een verzonden antwoord verandert de volgorde niet. De lijst ververst elke minuut. |
+| FR-10 | Het startscherm toont een lijst van aanvragen, standaard gesorteerd op `LaatsteBerichtOp` (nieuwste eerst; zie FR-17 voor andere sorteringen). Dat is het moment waarop het laatste **inkomende** bericht binnenkwam; een verzonden antwoord verandert de volgorde niet. De lijst ververst elke minuut. |
 | FR-11 | Aanvragen met `Onbeantwoord = ja` zijn duidelijk gemarkeerd (vet, met een accentkleur en een indicator). |
 | FR-12 | De status van elke aanvraag is direct zichtbaar als gekleurd label. |
 | FR-13 | Er kan gefilterd worden op elke status (meerdere tegelijk mogelijk). Standaard staan alle statussen behalve *Gesloten* en *Verwijderd* aan. *Verwijderd* is alleen zichtbaar als daar expliciet op gefilterd wordt. |
 | FR-14 | Er kan gezocht worden op naam, organisatie, e-mailadres en titel. |
 | FR-15 | De status kan direct vanuit de lijst gewijzigd worden (bijvoorbeeld via een snelmenu of veegactie op mobiel), zonder de aanvraag te openen. |
 | FR-16 | Een aanvraag kan als "verwerkt" gemarkeerd worden (`Onbeantwoord = nee`), ook zonder te antwoorden. |
+| FR-17 | De lijst kan gesorteerd worden op **laatste bericht** (standaard, nieuwste eerst), op **eerste demo** (datum van de vroegste demo van de aanvraag, vroegste eerst; aanvragen zonder demo onderaan) en op **status** (in de volgorde van §4.3, daarbinnen op laatste bericht). De gekozen sortering wordt per apparaat onthouden. |
+| FR-18 | Heeft een aanvraag een demo, dan toont de lijst de datum en tijd van de eerste demo. |
 
 ### 4.3 Statussen
 
@@ -119,7 +121,7 @@ De SharePoint-lijsten worden benaderd met de eigen SharePoint-rechten van de geb
 | FR-31 | Bij elk bericht staat een link "Openen in Outlook". Heeft een bericht bijlagen, dan staat er een paperclip-indicator bij. De bijlagen zelf worden niet in de app getoond; ze zijn bereikbaar via de Outlook-link. |
 | FR-32 | **Antwoorden** gebeurt in een rich-text-editor. De **afzender is altijd de gedeelde mailbox** ("Verzenden als", niet "Verzenden namens"): de ontvanger ziet alleen het adres van de gedeelde mailbox, niet de naam van de agent. De verzonden mail komt in *Verzonden items* van de gedeelde mailbox. Het antwoord gaat als antwoord binnen de bestaande conversatie (op het meest recente inkomende bericht). Standaard is dat **allen beantwoorden**: de afzender en alle Aan/CC-ontvangers, behalve de gedeelde mailbox zelf. De agent kan de ontvangers (Aan/CC) vóór verzending aanpassen. |
 | FR-33 | Standaardantwoorden kunnen met één klik op de cursorpositie worden ingevoegd. |
-| FR-34 | De handtekening wordt read-only onder de editor getoond en bij verzenden automatisch toegevoegd. |
+| FR-34 | De handtekening wordt read-only onder de editor getoond en bij verzenden automatisch toegevoegd, gescheiden van de tekst door een witregel. |
 | FR-35 | Een verzonden antwoord wordt als uitgaand bericht aan de aanvraag toegevoegd en zet `Onbeantwoord` op *nee*. |
 | FR-36 | Bij een aanvraag zonder inkomend bericht (handmatig aangemaakt) wordt een nieuwe e-mail gestuurd naar het e-mailadres van de aanvraag. |
 | FR-37 | *(Toekomst)* Een AI-prompt stelt een conceptantwoord voor. De editor moet zo opgezet worden dat tekst programmatisch ingevoegd kan worden. |
@@ -127,8 +129,9 @@ De SharePoint-lijsten worden benaderd met de eigen SharePoint-rechten van de geb
 | FR-39 | Snel naar een datum springen via een datumkiezer, vorige/volgende dag en snelknoppen voor datums die in de e-mail genoemd worden. Het herkennen van datums in de tekst is gewenst maar niet verplicht in versie 1 (zie FR-90). |
 | FR-40 | Vanuit de dagweergave kan direct een tijdvak gekozen worden om een demo in potlood te zetten. |
 | FR-41 | Een bericht kan handmatig naar een andere aanvraag worden verplaatst (correctie op koppelregel FR-02 stap 2). |
-| FR-42 | **Notities**: agents kunnen notities toevoegen die voor alle agents zichtbaar zijn, met auteur en tijdstip. |
+| FR-42 | **Notities**: agents kunnen notities toevoegen die voor alle agents zichtbaar zijn, met auteur en tijdstip. Elke agent kan een notitie wijzigen (met ETag-controle) of verwijderen (na bevestiging). Een gewijzigde notitie toont wie haar het laatst heeft gewijzigd en wanneer. |
 | FR-43 | **Definitief verwijderen** verwijdert de aanvraag met alle berichten, demo's, inzet en notities, plus de bijbehorende agenda-items. Dit vereist een bevestiging. De lijstitems gaan naar de prullenbak van de site, zodat een sitebeheerder ze in noodgevallen kan herstellen; de e-mails in de mailbox blijven bestaan. |
+| FR-44 | **Samenvoegen**: een aanvraag kan worden samengevoegd met een andere aanvraag (het doel, elke status behalve *Verwijderd*). Alle berichten, demo's (met inzet en agenda-afspraken), notities en statuswijzigingen gaan naar het doel. Lege klantgegevens van het doel worden aangevuld met die van de samengevoegde aanvraag; afwijkende gegevens worden niet overschreven maar in een notitie bij het doel vastgelegd, samen met de titel van de samengevoegde aanvraag. `Onbeantwoord` wordt *ja* als een van beide onbeantwoord was en `LaatsteBerichtOp` wordt de laatste van beide. De status van het doel blijft gelijk. Daarna gaat de samengevoegde aanvraag naar de prullenbak van de site. Dit vereist een bevestiging. |
 
 ### 4.5 Klantgegevens (per aanvraag)
 
@@ -189,8 +192,8 @@ De SharePoint-lijsten worden benaderd met de eigen SharePoint-rechten van de geb
 | FR-80 | Instellingen | Het adres van de gedeelde mailbox instellen en daarna de agenda kiezen uit de agenda's van die mailbox. Daarbij controleert de app of de ingelogde gebruiker toegang heeft tot de mailbox en de agenda. Zolang dit niet is ingesteld, toont de app bij het openen het instellingenscherm. |
 | FR-81 | Installatie op een site | Ontbreken de lijsten op de huidige site, dan biedt de app aan om ze aan te maken, met kolommen, indexen en beginwaarden (zoals de soorten demo). Dit vereist rechten als site-eigenaar; andere gebruikers krijgen een melding dat een eigenaar de app eerst moet installeren. |
 | FR-75 | Excel-export | Vraagt om een periode (van/tot) en maakt een .xlsx met deze tabbladen: **Demo's** (alle demo's in de periode met alle velden), **Begeleiders**, **Demo × begeleider** (matrix), **Uren per begeleider** (aantal demo's en totale uren), **Demo's per type** (aantal demo's en deelnemers). |
-| FR-76 | Hulp gezocht | Vraagt om het aantal weken (standaard 4) en maakt een **afbeelding** met een tabel van alle demo's vanaf vandaag in die periode die nog onvoldoende begeleiders hebben. Kolommen: datum, tijd, duur, titel, type, aantal deelnemers. |
-| FR-77 | Komende demo's | Zoals FR-76, maar met **alle** demo's. Daarbij een eerste kolom met een vinkje als de bezetting compleet is, en een duidelijke markering als er nog hulp nodig is. |
+| FR-76 | Hulp gezocht | Vraagt om het aantal weken (standaard 4) en maakt een **afbeelding** met een tabel van alle demo's vanaf vandaag in die periode die nog onvoldoende begeleiders hebben. Kolommen: datum, tijd, duur, titel, type, aantal deelnemers en de begeleiders die al zijn ingezet. Is er een borrel gewenst (alles behalve *geen* en *onbekend*), dan staat dat opvallend achter de titel, omdat niet elke begeleider een borrel kan verzorgen. |
+| FR-77 | Komende demo's | Zoals FR-76 (inclusief begeleiders en borrel), maar met **alle** demo's. Daarbij een eerste kolom met een vinkje als de bezetting compleet is, en een duidelijke markering als er nog hulp nodig is. |
 | FR-78 | Factuurlijst | Download een .xlsx met alle gegevens van alle aanvragen met status *Klaar voor facturatie*: alle klantvelden (§4.5) en alle demovelden (§4.6), inclusief de prijsafspraak en de toegewezen begeleiders. Eén rij per demo. |
 | FR-79 | Afbeeldingen (FR-76/77) kunnen worden **gedeeld** (deelmenu van het toestel, bijvoorbeeld WhatsApp), naar het **klembord gekopieerd** en als **PNG gedownload**. Opties die op het toestel niet beschikbaar zijn, worden verborgen. |
 
@@ -321,6 +324,7 @@ Vaste waarden in de code, niet instelbaar: opbouw- en opruimtijd 30 minuten, sta
 1. De agent opent de app; het startscherm toont de open aanvragen, gesorteerd op het laatste bericht.
 2. Onbeantwoorde aanvragen zijn gemarkeerd en elke aanvraag toont een statuslabel.
 3. De agent zet statusfilters aan of uit, of zoekt op tekst.
+4. De agent sorteert eventueel op eerste demo of op status.
 **Alternatief:** de agent kiest het filter *Verwijderd* en ziet alleen verwijderde aanvragen.
 
 ### UC-03 Status wijzigen
@@ -364,8 +368,9 @@ Vaste waarden in de code, niet instelbaar: opbouw- en opruimtijd 30 minuten, sta
 2. Het systeem slaat de inzet op, werkt de bezetting bij ("2 / 2") en past de locatie van de hoofdafspraak aan, inclusief of de tekst *help gezocht* nog nodig is.
 **Alternatief:** een begeleider verwijderen werkt op dezelfde manier en zorgt ook dat de agenda wordt bijgewerkt.
 
-### UC-11 Notitie toevoegen
+### UC-11 Notitie toevoegen, wijzigen of verwijderen
 1. De agent typt een notitie en slaat op; deze verschijnt met naam en tijdstip.
+**Alternatief:** de agent kiest bij een notitie *Wijzigen*, past de tekst aan en slaat op, of kiest *Verwijderen* en bevestigt.
 
 ### UC-12 Aanvraag definitief verwijderen
 1. De agent kiest *Definitief verwijderen*.
@@ -393,6 +398,11 @@ Standaardantwoorden, begeleiders, soorten demo en de handtekening worden via het
 
 ### UC-18 Factuurlijst
 1. De agent kiest *Factuurlijst*; het systeem maakt een .xlsx met alle aanvragen die *Klaar voor facturatie* zijn.
+
+### UC-19 Aanvragen samenvoegen
+1. De agent kiest bij een aanvraag *Samenvoegen met…* en zoekt de aanvraag waarin deze moet opgaan.
+2. Het systeem toont wat er gebeurt en vraagt om bevestiging.
+3. Het systeem verplaatst berichten, demo's, notities en geschiedenis naar het doel, vult lege klantgegevens aan, legt afwijkende gegevens vast in een notitie, verwijdert de samengevoegde aanvraag en opent het doel.
 
 ## 8. Schermen (globaal)
 

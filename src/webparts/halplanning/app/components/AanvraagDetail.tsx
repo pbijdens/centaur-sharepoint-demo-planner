@@ -3,6 +3,14 @@
 import * as React from 'react';
 import {
   Button,
+  Combobox,
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogContent,
+  DialogSurface,
+  DialogTitle,
+  Field,
   makeStyles,
   Menu,
   MenuDivider,
@@ -13,6 +21,7 @@ import {
   MessageBar,
   MessageBarActions,
   MessageBarBody,
+  Option,
   Tab,
   TabList,
   tokens
@@ -24,11 +33,13 @@ import {
   DeleteRegular,
   DeleteDismissRegular,
   MailUnreadRegular,
+  MergeRegular,
   MoreVerticalRegular,
   ArrowUndoRegular
 } from '@fluentui/react-icons';
 import { useDiensten } from '../AppContext';
 import { Aanvraag, Begeleider, Bericht, Demo, DemoType, Inzet, Status, STATUSSEN } from '../model';
+import { foutTekst } from '../services/sp';
 import { Fout, Laden, StatusBadge, useBevestig, useBezig, useGedeeldeStijl } from './algemeen';
 import { Conversatie } from './Conversatie';
 import { Dagweergave } from './Dagweergave';
@@ -57,7 +68,103 @@ interface Gegevens {
   demoTypes: DemoType[];
 }
 
-export function AanvraagDetail(props: { id: number; terug: () => void }): JSX.Element {
+const MAX_OPTIES = 50;
+
+/** Kiest de aanvraag waarin deze aanvraag opgaat en voert het samenvoegen uit (FR-44, UC-19). */
+function SamenvoegDialoog(props: {
+  open: boolean;
+  bron: Aanvraag;
+  aantalBerichten: number;
+  aantalDemos: number;
+  onVoortgang: (m: string) => void;
+  onSluit: (doelId?: number) => void;
+}): JSX.Element {
+  const d = useDiensten();
+  const [opties, setOpties] = React.useState<Aanvraag[] | undefined>();
+  const [fout, setFout] = React.useState<unknown>();
+  const [zoek, setZoek] = React.useState('');
+  const [keuze, setKeuze] = React.useState<Aanvraag | undefined>();
+  const [bezig, voerUit] = useBezig();
+
+  React.useEffect(() => {
+    if (!props.open) return;
+    setZoek('');
+    setKeuze(undefined);
+    setOpties(undefined);
+    setFout(undefined);
+    d.repo
+      .aanvragen(STATUSSEN.filter(st => st !== 'Verwijderd'))
+      .then(r => setOpties(r.filter(a => a.id !== props.bron.id)))
+      .catch(setFout);
+  }, [props.open]);
+
+  const label = (a: Aanvraag): string => [a.titel || a.naam || a.email || '(zonder titel)', a.email, a.status].filter(x => !!x).join(' · ');
+  const term = zoek.trim().toLowerCase();
+  const gevonden = (opties || []).filter(a => !term || [a.titel, a.naam, a.organisatie, a.email].some(v => (v || '').toLowerCase().indexOf(term) >= 0));
+  const bronTitel = props.bron.titel || props.bron.naam || props.bron.email;
+
+  const voegSamen = async (): Promise<void> => {
+    if (!keuze) return;
+    const ok = await voerUit(async () => {
+      await d.acties.voegSamen(props.bron, keuze.id, props.onVoortgang);
+      return true;
+    }, 'Aanvragen samengevoegd');
+    props.onVoortgang('');
+    if (ok) props.onSluit(keuze.id);
+  };
+
+  return (
+    <Dialog open={props.open} onOpenChange={(_, v) => !v.open && !bezig && props.onSluit()}>
+      <DialogSurface>
+        <DialogBody>
+          <DialogTitle>Samenvoegen met andere aanvraag</DialogTitle>
+          <DialogContent>
+            <Field label="Aanvraag waarin deze aanvraag opgaat" validationMessage={fout ? foutTekst(fout) : undefined}>
+              <Combobox
+                freeform
+                placeholder={opties ? 'Zoek op naam, organisatie, e-mail of titel' : 'Aanvragen laden…'}
+                disabled={!opties || bezig}
+                value={zoek}
+                selectedOptions={keuze ? [String(keuze.id)] : []}
+                onChange={e => {
+                  setZoek(e.target.value);
+                  setKeuze(undefined);
+                }}
+                onOptionSelect={(_, v) => {
+                  const a = (opties || []).filter(x => String(x.id) === v.optionValue)[0];
+                  setKeuze(a);
+                  setZoek(a ? label(a) : '');
+                }}
+              >
+                {gevonden.slice(0, MAX_OPTIES).map(a => (
+                  <Option key={a.id} value={String(a.id)} text={label(a)}>
+                    {label(a)}
+                  </Option>
+                ))}
+                {gevonden.length === 0 && opties && <Option disabled value="" text="">Geen aanvragen gevonden</Option>}
+              </Combobox>
+            </Field>
+            <p>
+              “{bronTitel}” gaat op in de gekozen aanvraag. {props.aantalBerichten} bericht(en), {props.aantalDemos} demo(’s) met begeleiders en
+              agenda-afspraken, notities en geschiedenis gaan mee. Lege klantgegevens worden aangevuld; afwijkende gegevens komen in een
+              notitie. De status van de gekozen aanvraag blijft gelijk. Daarna wordt “{bronTitel}” verwijderd.
+            </p>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => props.onSluit()} disabled={bezig}>
+              Annuleren
+            </Button>
+            <Button appearance="primary" icon={<MergeRegular />} disabled={!keuze || bezig} onClick={voegSamen}>
+              {bezig ? 'Bezig…' : 'Samenvoegen'}
+            </Button>
+          </DialogActions>
+        </DialogBody>
+      </DialogSurface>
+    </Dialog>
+  );
+}
+
+export function AanvraagDetail(props: { id: number; terug: () => void; open: (id: number) => void }): JSX.Element {
   const d = useDiensten();
   const s = useStijl();
   const g = useGedeeldeStijl();
@@ -69,6 +176,7 @@ export function AanvraagDetail(props: { id: number; terug: () => void }): JSX.El
   const [bezig, voerUit] = useBezig();
   const [bevestigDialoog, bevestig] = useBevestig();
   const [voortgang, setVoortgang] = React.useState('');
+  const [samenvoegen, setSamenvoegen] = React.useState(false);
 
   const laad = React.useCallback(async () => {
     try {
@@ -194,6 +302,9 @@ export function AanvraagDetail(props: { id: number; terug: () => void }): JSX.El
                   Markeren als onbeantwoord
                 </MenuItem>
               )}
+              <MenuItem icon={<MergeRegular />} onClick={() => setSamenvoegen(true)}>
+                Samenvoegen met…
+              </MenuItem>
               <MenuDivider />
               {a.status === 'Verwijderd' ? (
                 <MenuItem icon={<ArrowUndoRegular />} onClick={() => wijzigStatus('Nieuw')}>
@@ -211,6 +322,18 @@ export function AanvraagDetail(props: { id: number; terug: () => void }): JSX.El
           </MenuPopover>
         </Menu>
       </div>
+
+      <SamenvoegDialoog
+        open={samenvoegen}
+        bron={a}
+        aantalBerichten={gegevens.berichten.length}
+        aantalDemos={gegevens.demos.length}
+        onVoortgang={setVoortgang}
+        onSluit={doelId => {
+          setSamenvoegen(false);
+          if (doelId !== undefined) props.open(doelId);
+        }}
+      />
 
       {voortgang && (
         <MessageBar intent="info">

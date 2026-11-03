@@ -278,6 +278,12 @@ export class Repository {
     return rijen.map(naarDemo);
   }
 
+  /** Aanvraag en start van alle demo's, voor de sortering en de eerste demo op het startscherm (FR-17, FR-18). */
+  async demoStarts(): Promise<{ aanvraagId: number; start: Date }[]> {
+    const rijen = await this.alle('demos', ['AanvraagId', 'Start']);
+    return rijen.filter(r => num(r, 'AanvraagId') !== undefined && r.Start).map(r => ({ aanvraagId: num(r, 'AanvraagId') as number, start: datum(r, 'Start') as Date }));
+  }
+
   async maakDemo(d: Partial<Demo>): Promise<number> {
     return this.maak('demos', demoVelden(d));
   }
@@ -370,12 +376,41 @@ export class Repository {
   // ---- Notities en geschiedenis ----
 
   async notities(aanvraagId: number): Promise<Notitie[]> {
-    const rijen = await this.alle('notities', ['Id', 'AanvraagId', 'Tekst', 'Created', 'Author/Title'], 'AanvraagId eq ' + aanvraagId, ['Created', true], ['Author']);
-    return rijen.map(r => ({ id: num(r, 'Id') as number, aanvraagId, tekst: str(r, 'Tekst'), auteur: persoon(r, 'Author'), gemaakt: datum(r, 'Created') }));
+    const rijen = await this.alle(
+      'notities',
+      ['Id', 'AanvraagId', 'Tekst', 'Created', 'Modified', 'Author/Title', 'Editor/Title'],
+      'AanvraagId eq ' + aanvraagId,
+      ['Created', true],
+      ['Author', 'Editor']
+    );
+    return rijen.map(r => {
+      const gemaakt = datum(r, 'Created');
+      const gewijzigd = datum(r, 'Modified');
+      // Aanmaken en wijzigen vallen binnen enkele seconden samen als er niets gewijzigd is.
+      const isGewijzigd = !!gemaakt && !!gewijzigd && gewijzigd.getTime() - gemaakt.getTime() > 5000;
+      return {
+        id: num(r, 'Id') as number,
+        aanvraagId,
+        tekst: str(r, 'Tekst'),
+        auteur: persoon(r, 'Author'),
+        gemaakt,
+        gewijzigd: isGewijzigd ? gewijzigd : undefined,
+        gewijzigdDoor: isGewijzigd ? persoon(r, 'Editor') : undefined,
+        etag: etag(r)
+      };
+    });
   }
 
   async maakNotitie(aanvraagId: number, tekst: string): Promise<void> {
     await this.maak('notities', { AanvraagId: aanvraagId, Tekst: tekst });
+  }
+
+  async wijzigNotitie(id: number, tekst: string, etagWaarde?: string): Promise<void> {
+    await this.wijzig('notities', id, { Tekst: tekst }, etagWaarde);
+  }
+
+  async verwijderNotitie(id: number): Promise<void> {
+    await this.verwijder('notities', id);
   }
 
   async statuswijzigingen(aanvraagId: number): Promise<Statuswijziging[]> {
@@ -385,6 +420,13 @@ export class Repository {
 
   async logStatuswijziging(aanvraagId: number, van: string, naar: string): Promise<void> {
     await this.maak('statuswijzigingen', { AanvraagId: aanvraagId, VanStatus: van, NaarStatus: naar });
+  }
+
+  /** Koppelt alle items van een lijst die naar `van` verwijzen aan `naar` (samenvoegen, FR-44). */
+  async verplaatsNaarAanvraag(sleutel: 'berichten' | 'demos' | 'notities' | 'statuswijzigingen', van: number, naar: number): Promise<number> {
+    const rijen = await this.alle(sleutel, ['Id'], 'AanvraagId eq ' + van);
+    for (const r of rijen) await this.wijzig(sleutel, num(r, 'Id') as number, { AanvraagId: naar });
+    return rijen.length;
   }
 
   /** Verwijdert alle items van een lijst die naar de aanvraag verwijzen. */

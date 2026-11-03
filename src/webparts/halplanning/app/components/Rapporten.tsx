@@ -16,7 +16,7 @@ import {
 import { ArrowDownloadRegular, CopyRegular, ShareRegular } from '@fluentui/react-icons';
 import { Diensten, useDiensten } from '../AppContext';
 import { begin, datumKort, datumNumeriek, duurTekst, naarInvoerDatum, plusDagen, tijd, vanInvoer } from '../logic/datum';
-import { DemoRij, demoRijen, hulpGezocht, komendeDemos } from '../logic/rapportage';
+import { begeleiderNamen, borrelLabel, DemoRij, demoRijen, hulpGezocht, komendeDemos } from '../logic/rapportage';
 import { Begeleider } from '../model';
 import { bestandsdatum, deel, download, kanDelen, kanKopieren, kopieer } from '../rapporten/bestanden';
 import { Fout, Laden, useBezig, useGedeeldeStijl } from './algemeen';
@@ -105,7 +105,7 @@ const useLijstStijl = makeStyles({
     backgroundColor: '#ffffff',
     color: '#242424',
     padding: '16px',
-    width: '760px',
+    width: '880px',
     fontFamily: "'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', sans-serif",
     fontSize: '14px'
   },
@@ -120,6 +120,9 @@ const useLijstStijl = makeStyles({
   hulp: { backgroundColor: '#fdf3f4' },
   vink: { color: '#107c10', fontWeight: 700, textAlign: 'center' },
   tekort: { color: '#c50f1f', fontWeight: 700 },
+  // Opvallend: niet elke begeleider kan een borrel verzorgen.
+  borrel: { display: 'inline-block', marginLeft: '6px', padding: '0 6px', borderRadius: '4px', backgroundColor: '#fff4ce', color: '#8a5300', fontWeight: 600, whiteSpace: 'nowrap' },
+  begeleiders: { color: '#424242' },
   voorbeeld: { overflowX: 'auto', maxWidth: '100%', border: '1px solid #e0e0e0' }
 });
 
@@ -158,7 +161,7 @@ export function LijstDialoog(props: { soort?: 'hulp' | 'komend'; onSluit: () => 
 
   return (
     <Dialog open={!!props.soort} onOpenChange={(_, v) => !v.open && props.onSluit()}>
-      <DialogSurface style={{ maxWidth: 840 }}>
+      <DialogSurface style={{ maxWidth: 960 }}>
         <DialogBody>
           <DialogTitle>{titel}</DialogTitle>
           <DialogContent>
@@ -187,6 +190,7 @@ export function LijstDialoog(props: { soort?: 'hulp' | 'komend'; onSluit: () => 
                           <th>Titel</th>
                           <th>Type</th>
                           <th>Deelnemers</th>
+                          <th>Begeleiding</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -200,9 +204,13 @@ export function LijstDialoog(props: { soort?: 'hulp' | 'komend'; onSluit: () => 
                             <td>{datumNumeriek(r.demo.start)}</td>
                             <td>{tijd(r.demo.start)}</td>
                             <td>{duurTekst(r.demo.duurMinuten)}</td>
-                            <td>{r.demo.titel}</td>
+                            <td>
+                              {r.demo.titel}
+                              {borrelLabel(r.demo.borrel) && <span className={s.borrel}>{borrelLabel(r.demo.borrel)}</span>}
+                            </td>
                             <td>{r.typeNaam}</td>
                             <td>{r.demo.aantalDeelnemers ?? '?'}</td>
+                            <td className={s.begeleiders}>{begeleiderNamen(r) || '–'}</td>
                           </tr>
                         ))}
                       </tbody>

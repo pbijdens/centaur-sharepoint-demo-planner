@@ -1,4 +1,4 @@
-// Startscherm: lijst van aanvragen met statusfilters en zoeken (FR-10 t/m FR-16).
+// Startscherm: lijst van aanvragen met statusfilters, zoeken en sorteren (FR-10 t/m FR-18).
 
 import * as React from 'react';
 import {
@@ -8,6 +8,7 @@ import {
   Menu,
   MenuDivider,
   MenuItem,
+  MenuItemRadio,
   MenuList,
   MenuPopover,
   MenuTrigger,
@@ -16,13 +17,23 @@ import {
   tokens,
   Tooltip
 } from '@fluentui/react-components';
-import { ArrowClockwiseRegular, MoreVerticalRegular, SearchRegular, CheckmarkCircleRegular, MailUnreadRegular } from '@fluentui/react-icons';
+import {
+  ArrowClockwiseRegular,
+  ArrowSortRegular,
+  CalendarLtrRegular,
+  CheckmarkCircleRegular,
+  MailUnreadRegular,
+  MoreVerticalRegular,
+  SearchRegular
+} from '@fluentui/react-icons';
 import { useDiensten } from '../AppContext';
-import { tijdstipRelatief } from '../logic/datum';
+import { AanvraagSortering, eersteDemoPerAanvraag, SORTERINGEN, sorteerAanvragen } from '../logic/aanvragen';
+import { datumTijdKort, tijdstipRelatief } from '../logic/datum';
 import { Aanvraag, OPEN_STATUSSEN, Status, STATUSSEN } from '../model';
 import { Fout, Laden, StatusBadge, useBevestig, useBezig, useGedeeldeStijl } from './algemeen';
 
 const FILTER_SLEUTEL = 'halplanning.statusfilter';
+const SORTERING_SLEUTEL = 'halplanning.sortering';
 const VERVERS_MS = 60000;
 
 const useStijl = makeStyles({
@@ -57,6 +68,9 @@ const useStijl = makeStyles({
   },
   rechts: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 },
   tijd: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
+  demo: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2, whiteSpace: 'nowrap' },
+  demoNadruk: { color: tokens.colorBrandForeground1, fontWeight: tokens.fontWeightSemibold },
+  sorteer: { marginLeft: 'auto' },
   indicator: { color: tokens.colorBrandForeground1, flexShrink: 0 },
   zoek: { flexGrow: 1, minWidth: '180px' }
 });
@@ -71,20 +85,29 @@ function leesFilter(): Status[] {
   return OPEN_STATUSSEN.slice();
 }
 
+function leesSortering(): AanvraagSortering {
+  const s = localStorage.getItem(SORTERING_SLEUTEL);
+  return SORTERINGEN.some(x => x.waarde === s) ? (s as AanvraagSortering) : 'bericht';
+}
+
 export function AanvraagLijst(props: { open: (id: number) => void }): JSX.Element {
   const d = useDiensten();
   const s = useStijl();
   const g = useGedeeldeStijl();
   const [filter, setFilter] = React.useState<Status[]>(leesFilter);
   const [zoek, setZoek] = React.useState('');
+  const [sortering, setSortering] = React.useState<AanvraagSortering>(leesSortering);
   const [aanvragen, setAanvragen] = React.useState<Aanvraag[] | undefined>();
+  const [eersteDemo, setEersteDemo] = React.useState<Record<number, Date>>({});
   const [fout, setFout] = React.useState<unknown>();
   const [, voerUit] = useBezig();
   const [bevestigDialoog, bevestig] = useBevestig();
 
   const laad = React.useCallback(async () => {
     try {
-      setAanvragen(await d.repo.aanvragen(filter));
+      const [lijst, starts] = await Promise.all([d.repo.aanvragen(filter), d.repo.demoStarts()]);
+      setEersteDemo(eersteDemoPerAanvraag(starts));
+      setAanvragen(lijst);
       setFout(undefined);
     } catch (e) {
       setFout(e);
@@ -101,6 +124,11 @@ export function AanvraagLijst(props: { open: (id: number) => void }): JSX.Elemen
     }, VERVERS_MS);
     return () => window.clearInterval(t);
   }, [laad]);
+
+  const kiesSortering = (waarde: AanvraagSortering): void => {
+    localStorage.setItem(SORTERING_SLEUTEL, waarde);
+    setSortering(waarde);
+  };
 
   const wisselFilter = (status: Status): void => {
     setFilter(f => {
@@ -131,9 +159,12 @@ export function AanvraagLijst(props: { open: (id: number) => void }): JSX.Elemen
   };
 
   const term = zoek.trim().toLowerCase();
-  const zichtbaar = (aanvragen || []).filter(
-    a => !term || [a.titel, a.naam, a.organisatie, a.email].some(v => (v || '').toLowerCase().indexOf(term) >= 0)
+  const zichtbaar = sorteerAanvragen(
+    (aanvragen || []).filter(a => !term || [a.titel, a.naam, a.organisatie, a.email].some(v => (v || '').toLowerCase().indexOf(term) >= 0)),
+    sortering,
+    eersteDemo
   );
+  const sorteerLabel = SORTERINGEN.filter(x => x.waarde === sortering)[0].label;
 
   return (
     <div className={g.scherm}>
@@ -157,6 +188,22 @@ export function AanvraagLijst(props: { open: (id: number) => void }): JSX.Elemen
             {st}
           </ToggleButton>
         ))}
+        <Menu checkedValues={{ sortering: [sortering] }} onCheckedValueChange={(_, v) => kiesSortering(v.checkedItems[0] as AanvraagSortering)}>
+          <MenuTrigger disableButtonEnhancement>
+            <Button className={s.sorteer} size="small" shape="circular" appearance="subtle" icon={<ArrowSortRegular />} aria-label={'Sorteren op ' + sorteerLabel}>
+              {sorteerLabel}
+            </Button>
+          </MenuTrigger>
+          <MenuPopover>
+            <MenuList>
+              {SORTERINGEN.map(x => (
+                <MenuItemRadio key={x.waarde} name="sortering" value={x.waarde}>
+                  {x.label}
+                </MenuItemRadio>
+              ))}
+            </MenuList>
+          </MenuPopover>
+        </Menu>
       </div>
 
       {fout ? <Fout fout={fout} /> : undefined}
@@ -180,6 +227,12 @@ export function AanvraagLijst(props: { open: (id: number) => void }): JSX.Elemen
             </div>
             <div className={s.rechts}>
               <StatusBadge status={a.status} size="small" />
+              {eersteDemo[a.id] && (
+                <span className={mergeClasses(s.demo, sortering === 'demo' && s.demoNadruk)} title="Eerste demo">
+                  <CalendarLtrRegular aria-label="Eerste demo" />
+                  {datumTijdKort(eersteDemo[a.id])}
+                </span>
+              )}
               <span className={s.tijd}>{a.laatsteBerichtOp ? tijdstipRelatief(a.laatsteBerichtOp) : ''}</span>
             </div>
             <div onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
