@@ -1,4 +1,4 @@
-// Startscherm: lijst van aanvragen met statusfilters, zoeken en sorteren (FR-10 t/m FR-18).
+// Startscherm: lijst van aanvragen met statusfilters, zoeken en sorteren (FR-10 t/m FR-19).
 
 import * as React from 'react';
 import {
@@ -20,14 +20,16 @@ import {
 import {
   ArrowClockwiseRegular,
   ArrowSortRegular,
+  CalendarErrorRegular,
   CalendarLtrRegular,
   CheckmarkCircleRegular,
   MailUnreadRegular,
   MoreVerticalRegular,
+  PeopleErrorRegular,
   SearchRegular
 } from '@fluentui/react-icons';
 import { useDiensten } from '../AppContext';
-import { AanvraagSortering, eersteDemoPerAanvraag, SORTERINGEN, sorteerAanvragen } from '../logic/aanvragen';
+import { AanvraagSortering, demoOverzichtPerAanvraag, DemoOverzicht, SORTERINGEN, sorteerAanvragen } from '../logic/aanvragen';
 import { datumTijdKort, tijdstipRelatief } from '../logic/datum';
 import { Aanvraag, OPEN_STATUSSEN, Status, STATUSSEN } from '../model';
 import { Fout, Laden, StatusBadge, useBevestig, useBezig, useGedeeldeStijl } from './algemeen';
@@ -70,10 +72,24 @@ const useStijl = makeStyles({
   tijd: { fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground3 },
   demo: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2, whiteSpace: 'nowrap' },
   demoNadruk: { color: tokens.colorBrandForeground1, fontWeight: tokens.fontWeightSemibold },
+  demoVoorbij: { color: tokens.colorNeutralForeground3 },
+  meer: {
+    padding: '0 5px',
+    borderRadius: tokens.borderRadiusCircular,
+    backgroundColor: tokens.colorNeutralBackground3,
+    color: tokens.colorNeutralForeground2,
+    fontWeight: tokens.fontWeightSemibold
+  },
   sorteer: { marginLeft: 'auto' },
-  indicator: { color: tokens.colorBrandForeground1, flexShrink: 0 },
+  indicatoren: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0, fontSize: '20px' },
+  indicator: { display: 'flex', color: tokens.colorBrandForeground1 },
+  waarschuwing: { display: 'flex', color: tokens.colorPaletteRedForeground1 },
   zoek: { flexGrow: 1, minWidth: '180px' }
 });
+
+function meervoud(aantal: number, enkel: string, meer: string): string {
+  return aantal + ' ' + (aantal === 1 ? enkel : meer);
+}
 
 function leesFilter(): Status[] {
   try {
@@ -98,15 +114,15 @@ export function AanvraagLijst(props: { open: (id: number) => void }): JSX.Elemen
   const [zoek, setZoek] = React.useState('');
   const [sortering, setSortering] = React.useState<AanvraagSortering>(leesSortering);
   const [aanvragen, setAanvragen] = React.useState<Aanvraag[] | undefined>();
-  const [eersteDemo, setEersteDemo] = React.useState<Record<number, Date>>({});
+  const [overzicht, setOverzicht] = React.useState<Record<number, DemoOverzicht>>({});
   const [fout, setFout] = React.useState<unknown>();
   const [, voerUit] = useBezig();
   const [bevestigDialoog, bevestig] = useBevestig();
 
   const laad = React.useCallback(async () => {
     try {
-      const [lijst, starts] = await Promise.all([d.repo.aanvragen(filter), d.repo.demoStarts()]);
-      setEersteDemo(eersteDemoPerAanvraag(starts));
+      const [lijst, demos] = await Promise.all([d.repo.aanvragen(filter), d.repo.demosVoorLijst()]);
+      setOverzicht(demoOverzichtPerAanvraag(demos.demos, demos.inzet, new Date()));
       setAanvragen(lijst);
       setFout(undefined);
     } catch (e) {
@@ -162,7 +178,7 @@ export function AanvraagLijst(props: { open: (id: number) => void }): JSX.Elemen
   const zichtbaar = sorteerAanvragen(
     (aanvragen || []).filter(a => !term || [a.titel, a.naam, a.organisatie, a.email].some(v => (v || '').toLowerCase().indexOf(term) >= 0)),
     sortering,
-    eersteDemo
+    overzicht
   );
   const sorteerLabel = SORTERINGEN.filter(x => x.waarde === sortering)[0].label;
 
@@ -211,58 +227,91 @@ export function AanvraagLijst(props: { open: (id: number) => void }): JSX.Elemen
       {aanvragen && zichtbaar.length === 0 && <div className={g.leeg}>Geen aanvragen gevonden.</div>}
 
       <div className={s.lijst}>
-        {zichtbaar.map(a => (
-          <div
-            key={a.id}
-            className={mergeClasses(s.rij, a.onbeantwoord && s.onbeantwoord)}
-            role="button"
-            tabIndex={0}
-            onClick={() => props.open(a.id)}
-            onKeyDown={e => (e.key === 'Enter' ? props.open(a.id) : undefined)}
-          >
-            {a.onbeantwoord && <MailUnreadRegular className={s.indicator} aria-label="Onbeantwoord" />}
-            <div className={s.tekst}>
-              <div className={mergeClasses(s.titel, a.onbeantwoord && s.vet)}>{a.titel || a.naam || a.email || '(zonder titel)'}</div>
-              <div className={s.sub}>{[a.naam !== a.titel ? a.naam : '', a.organisatie, a.email].filter(x => !!x).join(' · ')}</div>
-            </div>
-            <div className={s.rechts}>
-              <StatusBadge status={a.status} size="small" />
-              {eersteDemo[a.id] && (
-                <span className={mergeClasses(s.demo, sortering === 'demo' && s.demoNadruk)} title="Eerste demo">
-                  <CalendarLtrRegular aria-label="Eerste demo" />
-                  {datumTijdKort(eersteDemo[a.id])}
-                </span>
+        {zichtbaar.map(a => {
+          const o: DemoOverzicht | undefined = overzicht[a.id];
+          // Bij verwijderde aanvragen zijn de afspraken bewust weggehaald; dan geen waarschuwingen.
+          const waarschuw = !!o && a.status !== 'Verwijderd';
+          const demoDatum = o && (o.volgende || o.laatste);
+          const demoLabel = o && o.volgende ? 'Eerstvolgende demo' : 'Laatste demo';
+          return (
+            <div
+              key={a.id}
+              className={mergeClasses(s.rij, a.onbeantwoord && s.onbeantwoord)}
+              role="button"
+              tabIndex={0}
+              onClick={() => props.open(a.id)}
+              onKeyDown={e => (e.key === 'Enter' ? props.open(a.id) : undefined)}
+            >
+              {(a.onbeantwoord || (waarschuw && (o.nietInAgenda > 0 || o.tekortBegeleiders > 0))) && (
+                <div className={s.indicatoren}>
+                  {a.onbeantwoord && (
+                    <span className={s.indicator} title="Onbeantwoord">
+                      <MailUnreadRegular aria-label="Onbeantwoord" />
+                    </span>
+                  )}
+                  {waarschuw && o.nietInAgenda > 0 && (
+                    <span className={s.waarschuwing} title={meervoud(o.nietInAgenda, 'demo staat', 'demo’s staan') + ' niet in de agenda'}>
+                      <CalendarErrorRegular aria-label="Niet in de agenda" />
+                    </span>
+                  )}
+                  {waarschuw && o.tekortBegeleiders > 0 && (
+                    <span className={s.waarschuwing} title={meervoud(o.tekortBegeleiders, 'demo heeft', 'demo’s hebben') + ' te weinig begeleiders'}>
+                      <PeopleErrorRegular aria-label="Te weinig begeleiders" />
+                    </span>
+                  )}
+                </div>
               )}
-              <span className={s.tijd}>{a.laatsteBerichtOp ? tijdstipRelatief(a.laatsteBerichtOp) : ''}</span>
-            </div>
-            <div onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
-              <Menu>
-                <MenuTrigger disableButtonEnhancement>
-                  <Button appearance="subtle" icon={<MoreVerticalRegular />} aria-label="Acties" />
-                </MenuTrigger>
-                <MenuPopover>
-                  <MenuList>
-                    {a.onbeantwoord ? (
-                      <MenuItem icon={<CheckmarkCircleRegular />} onClick={() => markeer(a, true)}>
-                        Markeren als verwerkt
-                      </MenuItem>
-                    ) : (
-                      <MenuItem icon={<MailUnreadRegular />} onClick={() => markeer(a, false)}>
-                        Markeren als onbeantwoord
-                      </MenuItem>
+              <div className={s.tekst}>
+                <div className={mergeClasses(s.titel, a.onbeantwoord && s.vet)}>{a.titel || a.naam || a.email || '(zonder titel)'}</div>
+                <div className={s.sub}>{[a.naam !== a.titel ? a.naam : '', a.organisatie, a.email].filter(x => !!x).join(' · ')}</div>
+              </div>
+              <div className={s.rechts}>
+                <StatusBadge status={a.status} size="small" />
+                {o && demoDatum && (
+                  <span
+                    className={mergeClasses(s.demo, !o.volgende && s.demoVoorbij, sortering === 'demo' && !!o.volgende && s.demoNadruk)}
+                    title={demoLabel + (o.aantal > 1 ? ' (' + o.aantal + ' demo’s in totaal)' : '')}
+                  >
+                    <CalendarLtrRegular aria-label={demoLabel} />
+                    {datumTijdKort(demoDatum)}
+                    {o.aantal > 1 && (
+                      <span className={s.meer} aria-label={o.aantal + ' demo’s in totaal'}>
+                        +{o.aantal - 1}
+                      </span>
                     )}
-                    <MenuDivider />
-                    {STATUSSEN.filter(st => st !== a.status).map(st => (
-                      <MenuItem key={st} onClick={() => wijzigStatus(a, st)}>
-                        Status: {st}
-                      </MenuItem>
-                    ))}
-                  </MenuList>
-                </MenuPopover>
-              </Menu>
+                  </span>
+                )}
+                <span className={s.tijd}>{a.laatsteBerichtOp ? tijdstipRelatief(a.laatsteBerichtOp) : ''}</span>
+              </div>
+              <div onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
+                <Menu>
+                  <MenuTrigger disableButtonEnhancement>
+                    <Button appearance="subtle" icon={<MoreVerticalRegular />} aria-label="Acties" />
+                  </MenuTrigger>
+                  <MenuPopover>
+                    <MenuList>
+                      {a.onbeantwoord ? (
+                        <MenuItem icon={<CheckmarkCircleRegular />} onClick={() => markeer(a, true)}>
+                          Markeren als verwerkt
+                        </MenuItem>
+                      ) : (
+                        <MenuItem icon={<MailUnreadRegular />} onClick={() => markeer(a, false)}>
+                          Markeren als onbeantwoord
+                        </MenuItem>
+                      )}
+                      <MenuDivider />
+                      {STATUSSEN.filter(st => st !== a.status).map(st => (
+                        <MenuItem key={st} onClick={() => wijzigStatus(a, st)}>
+                          Status: {st}
+                        </MenuItem>
+                      ))}
+                    </MenuList>
+                  </MenuPopover>
+                </Menu>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

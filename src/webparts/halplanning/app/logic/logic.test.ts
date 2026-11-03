@@ -3,7 +3,7 @@ import { naarGraphDatumTijd, vanGraphDatumTijd, vanInvoer, duurTekst } from './d
 import { allenBeantwoorden, parseAdressen, splitsCitaat, voegInNaBody, antwoordOnderwerp, naarTekst, antwoordHtml } from './mail';
 import { formatteerIban, isGeldigeIban, isGeldigEmail } from './validatie';
 import { demoRijen, hulpGezocht, komendeDemos, urenPerBegeleider, demosPerType, matrix, RapportBron, borrelLabel, begeleiderNamen } from './rapportage';
-import { eersteDemoPerAanvraag, samenvoeging, sorteerAanvragen } from './aanvragen';
+import { demoOverzichtPerAanvraag, LijstDemo, samenvoeging, sorteerAanvragen } from './aanvragen';
 import { Aanvraag, Begeleider, Demo } from '../model';
 
 describe('validatie', () => {
@@ -240,21 +240,37 @@ describe('aanvragen', () => {
     aanvraag(3, 'Nieuw', new Date(2026, 0, 2)),
     aanvraag(4, 'In afwachting')
   ];
-  const eerste = eersteDemoPerAanvraag([
-    { aanvraagId: 1, start: new Date(2026, 5, 9) },
-    { aanvraagId: 1, start: new Date(2026, 5, 2) },
-    { aanvraagId: 3, start: new Date(2026, 5, 5) }
-  ]);
+  const nu = new Date(2026, 5, 4, 12, 0);
+  const demo = (id: number, aanvraagId: number, start: Date, extra: Partial<LijstDemo> = {}): LijstDemo => ({
+    id, aanvraagId, start, duurMinuten: 60, begeleidersNodig: 2, eventIdDemo: 'e' + id, ...extra
+  });
+  const overzicht = demoOverzichtPerAanvraag(
+    [
+      demo(1, 1, new Date(2026, 5, 9)),
+      demo(2, 1, new Date(2026, 5, 2)),
+      demo(3, 1, new Date(2026, 5, 6), { eventIdDemo: '', begeleidersNodig: 0 }),
+      demo(4, 3, new Date(2026, 5, 5), { begeleidersNodig: 3 }),
+      demo(5, 2, new Date(2026, 4, 1, 9), { eventIdDemo: '', begeleidersNodig: 5 }),
+      demo(6, 2, new Date(2026, 5, 4, 11, 30))
+    ],
+    [1, 1, 2, 2, 3, 3, 4, 4, 6, 6].map(demoId => ({ demoId })),
+    nu
+  );
 
-  it('bepaalt de eerste demo per aanvraag', () => {
-    expect(eerste[1]).toEqual(new Date(2026, 5, 2));
-    expect(eerste[2]).toBeUndefined();
+  it('vat de demo’s per aanvraag samen', () => {
+    expect(overzicht[1]).toEqual({ aantal: 3, volgende: new Date(2026, 5, 6), laatste: new Date(2026, 5, 9), nietInAgenda: 1, tekortBegeleiders: 0 });
+    expect(overzicht[3]).toEqual({ aantal: 1, volgende: new Date(2026, 5, 5), laatste: new Date(2026, 5, 5), nietInAgenda: 0, tekortBegeleiders: 1 });
+    // Demo 6 loopt nog (tot 12:30) en telt als volgende; de voorbije demo 5 telt niet mee voor de waarschuwingen.
+    expect(overzicht[2]).toEqual({ aantal: 2, volgende: new Date(2026, 5, 4, 11, 30), laatste: new Date(2026, 5, 4, 11, 30), nietInAgenda: 0, tekortBegeleiders: 0 });
+    expect(overzicht[4]).toBeUndefined();
   });
 
-  it('sorteert op laatste bericht, eerste demo en status', () => {
-    expect(sorteerAanvragen(lijst, 'bericht', eerste).map(a => a.id)).toEqual([1, 3, 2, 4]);
-    expect(sorteerAanvragen(lijst, 'demo', eerste).map(a => a.id)).toEqual([1, 3, 2, 4]);
-    expect(sorteerAanvragen(lijst, 'status', eerste).map(a => a.id)).toEqual([3, 2, 4, 1]);
+  it('sorteert op laatste bericht, eerstvolgende demo en status', () => {
+    const alleenVoorbij = demoOverzichtPerAanvraag([demo(7, 2, new Date(2026, 4, 1))], [], nu);
+    expect(sorteerAanvragen(lijst, 'bericht', overzicht).map(a => a.id)).toEqual([1, 3, 2, 4]);
+    expect(sorteerAanvragen(lijst, 'demo', overzicht).map(a => a.id)).toEqual([2, 3, 1, 4]);
+    expect(sorteerAanvragen(lijst, 'demo', alleenVoorbij).map(a => a.id)).toEqual([1, 3, 2, 4]);
+    expect(sorteerAanvragen(lijst, 'status', overzicht).map(a => a.id)).toEqual([3, 2, 4, 1]);
     expect(lijst.map(a => a.id)).toEqual([1, 2, 3, 4]);
   });
 

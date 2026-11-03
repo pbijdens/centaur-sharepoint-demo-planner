@@ -4,6 +4,7 @@
 import { SPFI } from '@pnp/sp';
 import { IList } from '@pnp/sp/lists';
 import { LIJSTEN, LijstSleutel } from '../lists';
+import { LijstDemo } from '../logic/aanvragen';
 import {
   Aanvraag,
   Begeleider,
@@ -278,10 +279,16 @@ export class Repository {
     return rijen.map(naarDemo);
   }
 
-  /** Aanvraag en start van alle demo's, voor de sortering en de eerste demo op het startscherm (FR-17, FR-18). */
-  async demoStarts(): Promise<{ aanvraagId: number; start: Date }[]> {
-    const rijen = await this.alle('demos', ['AanvraagId', 'Start']);
-    return rijen.filter(r => num(r, 'AanvraagId') !== undefined && r.Start).map(r => ({ aanvraagId: num(r, 'AanvraagId') as number, start: datum(r, 'Start') as Date }));
+  /** Alle demo's en de inzet daarop, voor de sortering en de markeringen op het startscherm (FR-17 t/m FR-19). */
+  async demosVoorLijst(): Promise<{ demos: LijstDemo[]; inzet: { demoId: number }[] }> {
+    const [rijen, inzet] = await Promise.all([
+      this.alle('demos', ['Id', 'AanvraagId', 'Start', 'DuurMinuten', 'BegeleidersNodig', 'EventIdDemo']),
+      this.alle('inzet', ['DemoId'])
+    ]);
+    return {
+      demos: rijen.filter(r => num(r, 'AanvraagId') !== undefined && r.Start).map(naarDemo),
+      inzet: inzet.filter(r => num(r, 'DemoId') !== undefined).map(r => ({ demoId: num(r, 'DemoId') as number }))
+    };
   }
 
   async maakDemo(d: Partial<Demo>): Promise<number> {

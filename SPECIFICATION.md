@@ -99,8 +99,9 @@ De SharePoint-lijsten worden benaderd met de eigen SharePoint-rechten van de geb
 | FR-14 | Er kan gezocht worden op naam, organisatie, e-mailadres en titel. |
 | FR-15 | De status kan direct vanuit de lijst gewijzigd worden (bijvoorbeeld via een snelmenu of veegactie op mobiel), zonder de aanvraag te openen. |
 | FR-16 | Een aanvraag kan als "verwerkt" gemarkeerd worden (`Onbeantwoord = nee`), ook zonder te antwoorden. |
-| FR-17 | De lijst kan gesorteerd worden op **laatste bericht** (standaard, nieuwste eerst), op **eerste demo** (datum van de vroegste demo van de aanvraag, vroegste eerst; aanvragen zonder demo onderaan) en op **status** (in de volgorde van §4.3, daarbinnen op laatste bericht). De gekozen sortering wordt per apparaat onthouden. |
-| FR-18 | Heeft een aanvraag een demo, dan toont de lijst de datum en tijd van de eerste demo. |
+| FR-17 | De lijst kan gesorteerd worden op **laatste bericht** (standaard, nieuwste eerst), op **eerstvolgende demo** (start van de vroegste demo die nog niet is afgelopen, vroegste eerst; aanvragen zonder komende demo onderaan, daarbinnen op laatste bericht) en op **status** (in de volgorde van §4.3, daarbinnen op laatste bericht). De gekozen sortering wordt per apparaat onthouden. |
+| FR-18 | Heeft een aanvraag een demo, dan toont de lijst de datum en tijd van de eerstvolgende demo, of van de laatste demo als er geen komende demo meer is (gedimd). Heeft de aanvraag meer dan één demo, dan staat er een teller bij (bijvoorbeeld "+2" bij drie demo's). |
+| FR-19 | Op de plek van de markering voor onbeantwoord (FR-11) toont de lijst een rode agenda met uitroepteken als een komende demo van de aanvraag niet in de agenda staat, en rode personen met uitroepteken als een komende demo te weinig begeleiders heeft. "Komend" betekent: nog niet afgelopen. Bij aanvragen met status *Verwijderd* staan deze markeringen niet. |
 
 ### 4.3 Statussen
 
@@ -324,7 +325,7 @@ Vaste waarden in de code, niet instelbaar: opbouw- en opruimtijd 30 minuten, sta
 1. De agent opent de app; het startscherm toont de open aanvragen, gesorteerd op het laatste bericht.
 2. Onbeantwoorde aanvragen zijn gemarkeerd en elke aanvraag toont een statuslabel.
 3. De agent zet statusfilters aan of uit, of zoekt op tekst.
-4. De agent sorteert eventueel op eerste demo of op status.
+4. De agent sorteert eventueel op eerstvolgende demo of op status.
 **Alternatief:** de agent kiest het filter *Verwijderd* en ziet alleen verwijderde aanvragen.
 
 ### UC-03 Status wijzigen
