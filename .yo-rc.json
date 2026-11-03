@@ -1,0 +1,21 @@
+{
+  "@microsoft/generator-sharepoint": {
+    "whichFolder": "subdir",
+    "solutionName": "halplanning",
+    "environment": "spo",
+    "useGulp": false,
+    "componentType": "webpart",
+    "template": "react",
+    "componentName": "Halplanning",
+    "plusBeta": false,
+    "isCreatingSolution": true,
+    "nodeVersion": "26.13.0",
+    "sdksVersions": {},
+    "version": "1.24.1",
+    "libraryName": "halplanning",
+    "libraryId": "c77d03af-888a-4e68-bf42-8a7b1b25d9a4",
+    "packageManager": "npm",
+    "solutionShortDescription": "halplanning description",
+    "skipFeatureDeployment": true
+  }
+}

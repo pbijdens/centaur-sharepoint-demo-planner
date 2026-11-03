@@ -1,0 +1,16 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/config.2.0.schema.json",
+  "version": "2.0",
+  "bundles": {
+    "halplanning-web-part": {
+      "components": [
+        {
+          "entrypoint": "./lib/webparts/halplanning/HalplanningWebPart.js",
+          "manifest": "./src/webparts/halplanning/HalplanningWebPart.manifest.json"
+        }
+      ]
+    }
+  },
+  "externals": {},
+  "localizedResources": {}
+}

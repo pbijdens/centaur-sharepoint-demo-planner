@@ -1,0 +1,53 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/package-solution.schema.json",
+  "solution": {
+    "name": "halplanning-client-side-solution",
+    "id": "c77d03af-888a-4e68-bf42-8a7b1b25d9a4",
+    "version": "1.0.0.0",
+    "includeClientSideAssets": true,
+    "skipFeatureDeployment": true,
+    "developer": {
+      "name": "Centaur",
+      "websiteUrl": "",
+      "privacyUrl": "",
+      "termsOfUseUrl": "",
+      "mpnId": "Undefined-1.24.1"
+    },
+    "metadata": {
+      "shortDescription": {
+        "default": "Halplanning: demo-aanvragen afhandelen"
+      },
+      "longDescription": {
+        "default": "Halplanning verwerkt demo-aanvragen uit de gedeelde mailbox, plant demo's in de gedeelde agenda en beheert begeleiders en facturatie."
+      },
+      "screenshotPaths": [],
+      "videoUrl": "",
+      "categories": []
+    },
+    "features": [
+      {
+        "title": "Halplanning",
+        "description": "Activeert de Halplanning-app.",
+        "id": "3546ea29-1e0c-4233-bc49-fc93a9104f71",
+        "version": "1.0.0.0"
+      }
+    ],
+    "webApiPermissionRequests": [
+      {
+        "resource": "Microsoft Graph",
+        "scope": "Mail.ReadWrite.Shared"
+      },
+      {
+        "resource": "Microsoft Graph",
+        "scope": "Mail.Send.Shared"
+      },
+      {
+        "resource": "Microsoft Graph",
+        "scope": "Calendars.ReadWrite.Shared"
+      }
+    ]
+  },
+  "paths": {
+    "zippedPackage": "solution/halplanning.sppkg"
+  }
+}

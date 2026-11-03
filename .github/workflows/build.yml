@@ -1,0 +1,51 @@
+name: Productiebuild
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: productiebuild
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Afhankelijkheden installeren
+        run: npm ci
+
+      - name: Versienummer zetten
+        id: versie
+        run: echo "versie=$(node scripts/versie-zetten.mjs ${{ github.run_number }})" >> "$GITHUB_OUTPUT"
+
+      - name: Productiebuild en tests
+        run: npm run build
+
+      - name: Pakket bewaren als artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: halplanning-${{ steps.versie.outputs.versie }}
+          path: sharepoint/solution/halplanning.sppkg
+          if-no-files-found: error
+
+      - name: Release aanmaken
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.versie.outputs.versie }}" \
+            sharepoint/solution/halplanning.sppkg \
+            --target "${{ github.sha }}" \
+            --title "Halplanning ${{ steps.versie.outputs.versie }}" \
+            --generate-notes

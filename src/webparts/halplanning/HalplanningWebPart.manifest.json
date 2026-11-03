@@ -1,0 +1,26 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx/client-side-web-part-manifest.schema.json",
+  "id": "13c33b83-9bca-4735-9a75-a868475d6ee6",
+  "alias": "HalplanningWebPart",
+  "componentType": "WebPart",
+
+  // The "*" signifies that the version should be taken from the package.json
+  "version": "*",
+  "manifestVersion": 2,
+
+  "requiresCustomScript": false,
+  // Geen TeamsPersonalApp: een persoonlijke app draait niet in de context van een teamsite,
+  // terwijl de lijsten op de site van het team staan (SPECIFICATION.md B7).
+  "supportedHosts": ["SharePointWebPart", "SharePointFullPage", "TeamsTab"],
+  "supportsThemeVariants": true,
+  "supportsFullBleed": true,
+
+  "preconfiguredEntries": [{
+    "groupId": "5c03119e-3074-46fd-976b-c60198311f70", // Advanced
+    "group": { "default": "Advanced" },
+    "title": { "default": "Halplanning" },
+    "description": { "default": "Demo-aanvragen afhandelen en plannen" },
+    "officeFabricIconFontName": "Calendar",
+    "properties": {}
+  }]
+}
