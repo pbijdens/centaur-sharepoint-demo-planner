@@ -26,7 +26,16 @@ import {
   Textarea,
   tokens
 } from '@fluentui/react-components';
-import { AddRegular, CalendarCheckmarkRegular, DeleteRegular, EditRegular, MoreVerticalRegular, PersonAddRegular, DismissRegular } from '@fluentui/react-icons';
+import {
+  AddRegular,
+  ArrowForwardRegular,
+  CalendarCheckmarkRegular,
+  DeleteRegular,
+  EditRegular,
+  MoreVerticalRegular,
+  PersonAddRegular,
+  DismissRegular
+} from '@fluentui/react-icons';
 import { useDiensten } from '../AppContext';
 import { AfspraakSoort } from '../logic/agenda';
 import { datumLang, duurTekst, naarInvoerDatum, naarInvoerTijd, tijd, vanInvoer } from '../logic/datum';
@@ -45,6 +54,7 @@ import {
   WEDSTRIJD_OPTIES,
   Wedstrijd
 } from '../model';
+import { aanvraagLabel, AanvraagKiezer } from './AanvraagKiezer';
 import { useBevestig, useBezig, useGedeeldeStijl } from './algemeen';
 
 const useStijl = makeStyles({
@@ -283,6 +293,50 @@ function DefinitiefDialoog(props: { demo?: Demo; onSluit: (gelukt: boolean, ontb
   );
 }
 
+/** Verplaatst een demo naar een andere bestaande aanvraag (FR-45, UC-20). */
+function VerplaatsDemoDialoog(props: { demo?: Demo; aanvraag: Aanvraag; onSluit: (doel?: Aanvraag) => void }): JSX.Element {
+  const d = useDiensten();
+  const [keuze, setKeuze] = React.useState<Aanvraag | undefined>();
+  const [bezig, voerUit] = useBezig();
+
+  const verplaats = async (): Promise<void> => {
+    if (!props.demo || !keuze) return;
+    const doel = keuze;
+    const ok = await voerUit(async () => {
+      await d.acties.verplaatsDemo(props.demo as Demo, props.aanvraag, doel.id);
+      return true;
+    }, 'Demo verplaatst naar ' + (doel.titel || doel.naam || doel.email));
+    if (ok) props.onSluit(doel);
+  };
+
+  return (
+    <Dialog open={!!props.demo} onOpenChange={(_, v) => !v.open && !bezig && props.onSluit()}>
+      <DialogSurface>
+        <DialogBody>
+          <DialogTitle>Demo verplaatsen</DialogTitle>
+          <DialogContent>
+            <AanvraagKiezer actief={!!props.demo} label="Naar aanvraag" zonderId={props.aanvraag.id} keuze={keuze} onKeuze={setKeuze} disabled={bezig} />
+            {props.demo && (
+              <p>
+                “{props.demo.titel}” van {datumLang(props.demo.start)} gaat met de begeleiders en de agenda-afspraken naar
+                {keuze ? ' “' + aanvraagLabel(keuze) + '”' : ' de gekozen aanvraag'}. De agenda verandert niet. Beide aanvragen krijgen een notitie.
+              </p>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => props.onSluit()} disabled={bezig}>
+              Annuleren
+            </Button>
+            <Button appearance="primary" icon={<ArrowForwardRegular />} disabled={!keuze || bezig} onClick={verplaats}>
+              {bezig ? 'Bezig…' : 'Verplaatsen'}
+            </Button>
+          </DialogActions>
+        </DialogBody>
+      </DialogSurface>
+    </Dialog>
+  );
+}
+
 function Begeleiders(props: {
   demo: Demo;
   inzet: Inzet[];
@@ -370,6 +424,7 @@ export function Demos(props: {
   const g = useGedeeldeStijl();
   const [dialoog, setDialoog] = React.useState<{ demo?: Demo; start?: Date } | undefined>();
   const [definitief, setDefinitief] = React.useState<Demo | undefined>();
+  const [verplaats, setVerplaats] = React.useState<Demo | undefined>();
   const [ontbrekend, setOntbrekend] = React.useState<Record<number, AfspraakSoort[]>>({});
   const [bezig, voerUit] = useBezig();
   const [bevestigDialoog, bevestig] = useBevestig();
@@ -441,6 +496,9 @@ export function Demos(props: {
                           Definitief maken
                         </MenuItem>
                       )}
+                      <MenuItem icon={<ArrowForwardRegular />} onClick={() => setVerplaats(demo)}>
+                        Verplaatsen naar andere aanvraag…
+                      </MenuItem>
                       <MenuItem icon={<DeleteRegular />} onClick={() => verwijder(demo)}>
                         Verwijderen
                       </MenuItem>
@@ -535,6 +593,14 @@ export function Demos(props: {
               props.stelStatusVoor('Bevestigd', 'De demo is definitief gemaakt.');
             }
           }
+        }}
+      />
+      <VerplaatsDemoDialoog
+        demo={verplaats}
+        aanvraag={props.aanvraag}
+        onSluit={doel => {
+          setVerplaats(undefined);
+          if (doel) props.herlaad().catch(() => undefined);
         }}
       />
     </div>

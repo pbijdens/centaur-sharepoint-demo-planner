@@ -18,6 +18,7 @@ import {
   Tooltip
 } from '@fluentui/react-components';
 import {
+  AddRegular,
   ArrowClockwiseRegular,
   ArrowSortRegular,
   CalendarErrorRegular,
@@ -81,7 +82,8 @@ const useStijl = makeStyles({
     fontWeight: tokens.fontWeightSemibold
   },
   sorteer: { marginLeft: 'auto' },
-  indicatoren: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0, fontSize: '20px' },
+  // Altijd even breed, ook zonder iconen, zodat alle titels gelijk uitlijnen.
+  indicatoren: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flexShrink: 0, width: '20px', fontSize: '20px' },
   indicator: { display: 'flex', color: tokens.colorBrandForeground1 },
   waarschuwing: { display: 'flex', color: tokens.colorPaletteRedForeground1 },
   zoek: { flexGrow: 1, minWidth: '180px' }
@@ -106,7 +108,7 @@ function leesSortering(): AanvraagSortering {
   return SORTERINGEN.some(x => x.waarde === s) ? (s as AanvraagSortering) : 'bericht';
 }
 
-export function AanvraagLijst(props: { open: (id: number) => void }): JSX.Element {
+export function AanvraagLijst(props: { open: (id: number) => void; nieuw: () => void }): JSX.Element {
   const d = useDiensten();
   const s = useStijl();
   const g = useGedeeldeStijl();
@@ -196,6 +198,9 @@ export function AanvraagLijst(props: { open: (id: number) => void }): JSX.Elemen
         <Tooltip content="Vernieuwen" relationship="label">
           <Button icon={<ArrowClockwiseRegular />} onClick={() => laad()} />
         </Tooltip>
+        <Tooltip content="Nieuwe aanvraag (zonder e-mail)" relationship="label">
+          <Button appearance="primary" icon={<AddRegular />} onClick={props.nieuw} />
+        </Tooltip>
       </div>
 
       <div className={s.filters} role="group" aria-label="Filter op status">
@@ -242,25 +247,23 @@ export function AanvraagLijst(props: { open: (id: number) => void }): JSX.Elemen
               onClick={() => props.open(a.id)}
               onKeyDown={e => (e.key === 'Enter' ? props.open(a.id) : undefined)}
             >
-              {(a.onbeantwoord || (waarschuw && (o.nietInAgenda > 0 || o.tekortBegeleiders > 0))) && (
-                <div className={s.indicatoren}>
-                  {a.onbeantwoord && (
-                    <span className={s.indicator} title="Onbeantwoord">
-                      <MailUnreadRegular aria-label="Onbeantwoord" />
-                    </span>
-                  )}
-                  {waarschuw && o.nietInAgenda > 0 && (
-                    <span className={s.waarschuwing} title={meervoud(o.nietInAgenda, 'demo staat', 'demo’s staan') + ' niet in de agenda'}>
-                      <CalendarErrorRegular aria-label="Niet in de agenda" />
-                    </span>
-                  )}
-                  {waarschuw && o.tekortBegeleiders > 0 && (
-                    <span className={s.waarschuwing} title={meervoud(o.tekortBegeleiders, 'demo heeft', 'demo’s hebben') + ' te weinig begeleiders'}>
-                      <PeopleErrorRegular aria-label="Te weinig begeleiders" />
-                    </span>
-                  )}
-                </div>
-              )}
+              <div className={s.indicatoren}>
+                {a.onbeantwoord && (
+                  <span className={s.indicator} title="Onbeantwoord">
+                    <MailUnreadRegular aria-label="Onbeantwoord" />
+                  </span>
+                )}
+                {waarschuw && o.nietInAgenda > 0 && (
+                  <span className={s.waarschuwing} title={meervoud(o.nietInAgenda, 'demo staat', 'demo’s staan') + ' niet in de agenda'}>
+                    <CalendarErrorRegular aria-label="Niet in de agenda" />
+                  </span>
+                )}
+                {waarschuw && o.tekortBegeleiders > 0 && (
+                  <span className={s.waarschuwing} title={meervoud(o.tekortBegeleiders, 'demo heeft', 'demo’s hebben') + ' te weinig begeleiders'}>
+                    <PeopleErrorRegular aria-label="Te weinig begeleiders" />
+                  </span>
+                )}
+              </div>
               <div className={s.tekst}>
                 <div className={mergeClasses(s.titel, a.onbeantwoord && s.vet)}>{a.titel || a.naam || a.email || '(zonder titel)'}</div>
                 <div className={s.sub}>{[a.naam !== a.titel ? a.naam : '', a.organisatie, a.email].filter(x => !!x).join(' · ')}</div>

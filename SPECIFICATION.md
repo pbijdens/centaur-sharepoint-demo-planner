@@ -133,6 +133,7 @@ De SharePoint-lijsten worden benaderd met de eigen SharePoint-rechten van de geb
 | FR-42 | **Notities**: agents kunnen notities toevoegen die voor alle agents zichtbaar zijn, met auteur en tijdstip. Elke agent kan een notitie wijzigen (met ETag-controle) of verwijderen (na bevestiging). Een gewijzigde notitie toont wie haar het laatst heeft gewijzigd en wanneer. |
 | FR-43 | **Definitief verwijderen** verwijdert de aanvraag met alle berichten, demo's, inzet en notities, plus de bijbehorende agenda-items. Dit vereist een bevestiging. De lijstitems gaan naar de prullenbak van de site, zodat een sitebeheerder ze in noodgevallen kan herstellen; de e-mails in de mailbox blijven bestaan. |
 | FR-44 | **Samenvoegen**: een aanvraag kan worden samengevoegd met een andere aanvraag (het doel, elke status behalve *Verwijderd*). Alle berichten, demo's (met inzet en agenda-afspraken), notities en statuswijzigingen gaan naar het doel. Lege klantgegevens van het doel worden aangevuld met die van de samengevoegde aanvraag; afwijkende gegevens worden niet overschreven maar in een notitie bij het doel vastgelegd, samen met de titel van de samengevoegde aanvraag. `Onbeantwoord` wordt *ja* als een van beide onbeantwoord was en `LaatsteBerichtOp` wordt de laatste van beide. De status van het doel blijft gelijk. Daarna gaat de samengevoegde aanvraag naar de prullenbak van de site. Dit vereist een bevestiging. |
+| FR-45 | **Demo verplaatsen**: een demo kan naar een andere bestaande aanvraag worden verplaatst (elke status behalve *Verwijderd*). Inzet en agenda-afspraken gaan mee; de afspraken zelf veranderen niet. Beide aanvragen krijgen een notitie. |
 
 ### 4.5 Klantgegevens (per aanvraag)
 
@@ -383,7 +384,7 @@ Vaste waarden in de code, niet instelbaar: opbouw- en opruimtijd 30 minuten, sta
 2. Het systeem past de koppeling aan en werkt `LaatsteBerichtOp` van beide aanvragen bij.
 
 ### UC-14 Handmatig een aanvraag aanmaken
-1. Via het menu kiest de agent *Nieuwe aanvraag*, vult de klantgegevens in en slaat op (Bron = Handmatig, status *Nieuw*).
+1. Via de knop **+** op het startscherm of via het menu kiest de agent *Nieuwe aanvraag*, vult de klantgegevens in en slaat op (Bron = Handmatig, status *Nieuw*).
 
 ### UC-15 Stamgegevens beheren
 Standaardantwoorden, begeleiders, soorten demo en de handtekening worden via het menu beheerd met eenvoudige lijst- en formulierschermen.
@@ -404,6 +405,10 @@ Standaardantwoorden, begeleiders, soorten demo en de handtekening worden via het
 1. De agent kiest bij een aanvraag *Samenvoegen met…* en zoekt de aanvraag waarin deze moet opgaan.
 2. Het systeem toont wat er gebeurt en vraagt om bevestiging.
 3. Het systeem verplaatst berichten, demo's, notities en geschiedenis naar het doel, vult lege klantgegevens aan, legt afwijkende gegevens vast in een notitie, verwijdert de samengevoegde aanvraag en opent het doel.
+
+### UC-20 Demo verplaatsen
+1. De agent kiest bij een demo *Verplaatsen naar andere aanvraag…* en zoekt de aanvraag waar de demo heen moet.
+2. Het systeem verplaatst de demo met inzet en agenda-afspraken en zet bij beide aanvragen een notitie (FR-45).
 
 ## 8. Schermen (globaal)
 

@@ -3,14 +3,12 @@
 import * as React from 'react';
 import {
   Button,
-  Combobox,
   Dialog,
   DialogActions,
   DialogBody,
   DialogContent,
   DialogSurface,
   DialogTitle,
-  Field,
   makeStyles,
   Menu,
   MenuDivider,
@@ -21,7 +19,6 @@ import {
   MessageBar,
   MessageBarActions,
   MessageBarBody,
-  Option,
   Tab,
   TabList,
   tokens
@@ -39,7 +36,7 @@ import {
 } from '@fluentui/react-icons';
 import { useDiensten } from '../AppContext';
 import { Aanvraag, Begeleider, Bericht, Demo, DemoType, Inzet, Status, STATUSSEN } from '../model';
-import { foutTekst } from '../services/sp';
+import { AanvraagKiezer } from './AanvraagKiezer';
 import { Fout, Laden, StatusBadge, useBevestig, useBezig, useGedeeldeStijl } from './algemeen';
 import { Conversatie } from './Conversatie';
 import { Dagweergave } from './Dagweergave';
@@ -68,8 +65,6 @@ interface Gegevens {
   demoTypes: DemoType[];
 }
 
-const MAX_OPTIES = 50;
-
 /** Kiest de aanvraag waarin deze aanvraag opgaat en voert het samenvoegen uit (FR-44, UC-19). */
 function SamenvoegDialoog(props: {
   open: boolean;
@@ -80,27 +75,9 @@ function SamenvoegDialoog(props: {
   onSluit: (doelId?: number) => void;
 }): JSX.Element {
   const d = useDiensten();
-  const [opties, setOpties] = React.useState<Aanvraag[] | undefined>();
-  const [fout, setFout] = React.useState<unknown>();
-  const [zoek, setZoek] = React.useState('');
   const [keuze, setKeuze] = React.useState<Aanvraag | undefined>();
   const [bezig, voerUit] = useBezig();
 
-  React.useEffect(() => {
-    if (!props.open) return;
-    setZoek('');
-    setKeuze(undefined);
-    setOpties(undefined);
-    setFout(undefined);
-    d.repo
-      .aanvragen(STATUSSEN.filter(st => st !== 'Verwijderd'))
-      .then(r => setOpties(r.filter(a => a.id !== props.bron.id)))
-      .catch(setFout);
-  }, [props.open]);
-
-  const label = (a: Aanvraag): string => [a.titel || a.naam || a.email || '(zonder titel)', a.email, a.status].filter(x => !!x).join(' · ');
-  const term = zoek.trim().toLowerCase();
-  const gevonden = (opties || []).filter(a => !term || [a.titel, a.naam, a.organisatie, a.email].some(v => (v || '').toLowerCase().indexOf(term) >= 0));
   const bronTitel = props.bron.titel || props.bron.naam || props.bron.email;
 
   const voegSamen = async (): Promise<void> => {
@@ -119,31 +96,14 @@ function SamenvoegDialoog(props: {
         <DialogBody>
           <DialogTitle>Samenvoegen met andere aanvraag</DialogTitle>
           <DialogContent>
-            <Field label="Aanvraag waarin deze aanvraag opgaat" validationMessage={fout ? foutTekst(fout) : undefined}>
-              <Combobox
-                freeform
-                placeholder={opties ? 'Zoek op naam, organisatie, e-mail of titel' : 'Aanvragen laden…'}
-                disabled={!opties || bezig}
-                value={zoek}
-                selectedOptions={keuze ? [String(keuze.id)] : []}
-                onChange={e => {
-                  setZoek(e.target.value);
-                  setKeuze(undefined);
-                }}
-                onOptionSelect={(_, v) => {
-                  const a = (opties || []).filter(x => String(x.id) === v.optionValue)[0];
-                  setKeuze(a);
-                  setZoek(a ? label(a) : '');
-                }}
-              >
-                {gevonden.slice(0, MAX_OPTIES).map(a => (
-                  <Option key={a.id} value={String(a.id)} text={label(a)}>
-                    {label(a)}
-                  </Option>
-                ))}
-                {gevonden.length === 0 && opties && <Option disabled value="" text="">Geen aanvragen gevonden</Option>}
-              </Combobox>
-            </Field>
+            <AanvraagKiezer
+              actief={props.open}
+              label="Aanvraag waarin deze aanvraag opgaat"
+              zonderId={props.bron.id}
+              keuze={keuze}
+              onKeuze={setKeuze}
+              disabled={bezig}
+            />
             <p>
               “{bronTitel}” gaat op in de gekozen aanvraag. {props.aantalBerichten} bericht(en), {props.aantalDemos} demo(’s) met begeleiders en
               agenda-afspraken, notities en geschiedenis gaan mee. Lege klantgegevens worden aangevuld; afwijkende gegevens komen in een

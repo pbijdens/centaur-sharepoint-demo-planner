@@ -2,6 +2,7 @@
 
 import { afsprakenVoorDemo, AfspraakSoort, AFSPRAAKSOORTEN } from '../logic/agenda';
 import { samenvoeging } from '../logic/aanvragen';
+import { datumTijdKort } from '../logic/datum';
 import { antwoordHtml, parseAdressen } from '../logic/mail';
 import {
   Aanvraag,
@@ -219,6 +220,21 @@ export class Acties {
     await this.herberekenLaatsteBericht(van);
     await this.herberekenLaatsteBericht(doel);
     return doel;
+  }
+
+  /**
+   * Verplaatst een demo met inzet en agenda-afspraken naar een andere bestaande aanvraag (FR-45, UC-20). De afspraken
+   * bevatten geen gegevens van de aanvraag en blijven dus ongewijzigd. Beide aanvragen krijgen een notitie.
+   */
+  async verplaatsDemo(demo: Demo, van: Aanvraag, doelId: number): Promise<void> {
+    if (demo.aanvraagId === doelId) throw new Error('De demo hoort al bij deze aanvraag.');
+    const doel = await this.repo.aanvraag(doelId);
+    if (doel.status === 'Verwijderd') throw new Error('Een demo verplaatsen naar een verwijderde aanvraag kan niet.');
+    await this.repo.wijzigDemo(demo.id, { aanvraagId: doelId }, demo.etag);
+    const wat = 'Demo “' + demo.titel + '” van ' + datumTijdKort(demo.start);
+    const titel = (a: Aanvraag): string => '“' + (a.titel || a.naam || a.email || 'zonder titel') + '”';
+    await this.repo.maakNotitie(van.id, wat + ' is verplaatst naar aanvraag ' + titel(doel) + '.');
+    await this.repo.maakNotitie(doelId, wat + ' is hierheen verplaatst vanuit aanvraag ' + titel(van) + '.');
   }
 
   private async herberekenLaatsteBericht(aanvraagId: number): Promise<void> {
