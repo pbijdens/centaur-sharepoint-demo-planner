@@ -111,6 +111,38 @@ export class Acties {
     return id;
   }
 
+  /**
+   * Dupliceren (FR-59): maakt per starttijd een kopie van de demo in dezelfde aanvraag, met dezelfde gegevens,
+   * planningsstatus en begeleiders, en zet de afspraken in de agenda. Geeft de ids van de kopieën.
+   */
+  async dupliceerDemo(demo: Demo, starts: Date[], voortgang?: (m: string) => void): Promise<number[]> {
+    const melding = voortgang || ((): void => undefined);
+    const inzet = await this.repo.inzetVoorDemos([demo.id]);
+    await this.graph.zorgVoorCategorieen();
+    const ids: number[] = [];
+    for (const start of starts) {
+      melding('Kopie ' + (ids.length + 1) + ' van ' + starts.length + ' maken…');
+      const id = await this.repo.maakDemo({
+        aanvraagId: demo.aanvraagId,
+        titel: demo.titel,
+        start,
+        duurMinuten: demo.duurMinuten,
+        demoTypeId: demo.demoTypeId,
+        aantalDeelnemers: demo.aantalDeelnemers,
+        begeleidersNodig: demo.begeleidersNodig,
+        borrel: demo.borrel,
+        wedstrijd: demo.wedstrijd,
+        prijsafspraak: demo.prijsafspraak,
+        notitie: demo.notitie,
+        planningsstatus: demo.planningsstatus
+      });
+      for (const i of inzet) await this.repo.maakInzet({ demoId: id, begeleiderId: i.begeleiderId, duurMinuten: i.duurMinuten });
+      await this.synchroniseerDemo(id, true);
+      ids.push(id);
+    }
+    return ids;
+  }
+
   /** Wijzigt een demo en werkt de agenda bij. */
   async wijzigDemo(demo: Demo, wijziging: Partial<Demo>): Promise<SyncResultaat> {
     await this.repo.wijzigDemo(demo.id, wijziging, demo.etag);

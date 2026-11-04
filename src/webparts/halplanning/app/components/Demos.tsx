@@ -30,6 +30,7 @@ import {
   AddRegular,
   ArrowForwardRegular,
   CalendarCheckmarkRegular,
+  CopyRegular,
   DeleteRegular,
   EditRegular,
   MoreVerticalRegular,
@@ -38,7 +39,7 @@ import {
 } from '@fluentui/react-icons';
 import { useDiensten } from '../AppContext';
 import { AfspraakSoort } from '../logic/agenda';
-import { datumLang, duurTekst, naarInvoerDatum, naarInvoerTijd, tijd, vanInvoer } from '../logic/datum';
+import { datumLang, duurTekst, naarInvoerDatum, naarInvoerTijd, plusDagen, tijd, vanInvoer } from '../logic/datum';
 import {
   Aanvraag,
   Begeleider,
@@ -337,6 +338,91 @@ function VerplaatsDemoDialoog(props: { demo?: Demo; aanvraag: Aanvraag; onSluit:
   );
 }
 
+/** Dupliceert een demo naar één of meer datums binnen dezelfde aanvraag (FR-59, UC-21). */
+function DupliceerDemoDialoog(props: { demo?: Demo; inzet: Inzet[]; onSluit: (gelukt: boolean) => void }): JSX.Element {
+  const d = useDiensten();
+  const s = useStijl();
+  const [rijen, setRijen] = React.useState<{ datum: string; tijd: string }[]>([]);
+  const [voortgang, setVoortgang] = React.useState('');
+  const [bezig, voerUit] = useBezig();
+
+  const rijOp = (start: Date): { datum: string; tijd: string } => ({ datum: naarInvoerDatum(start), tijd: naarInvoerTijd(start) });
+
+  React.useEffect(() => {
+    if (props.demo) setRijen([rijOp(plusDagen(props.demo.start, 7))]);
+    setVoortgang('');
+  }, [props.demo]);
+
+  const starts = rijen.map(r => vanInvoer(r.datum, r.tijd));
+  const geldig = rijen.length > 0 && starts.every(x => !!x);
+  const aantalBegeleiders = props.demo ? props.inzet.filter(i => i.demoId === (props.demo as Demo).id).length : 0;
+
+  const zet = (n: number, k: 'datum' | 'tijd', v: string): void => setRijen(rijen.map((r, i) => (i === n ? { ...r, [k]: v } : r)));
+  const voegToe = (): void => {
+    const laatste = starts[starts.length - 1] || (props.demo as Demo).start;
+    setRijen([...rijen, rijOp(plusDagen(laatste, 7))]);
+  };
+
+  const dupliceer = async (): Promise<void> => {
+    if (!props.demo || !geldig) return;
+    const lijst = starts as Date[];
+    await voerUit(
+      () => d.acties.dupliceerDemo(props.demo as Demo, lijst, setVoortgang),
+      lijst.length === 1 ? 'Demo gedupliceerd en in de agenda gezet' : lijst.length + ' kopieën gemaakt en in de agenda gezet'
+    );
+    setVoortgang('');
+    // Ook na een fout halverwege sluiten en herladen: een deel van de kopieën kan al bestaan, en opnieuw starten
+    // zou die dubbel maken.
+    props.onSluit(true);
+  };
+
+  return (
+    <Dialog open={!!props.demo} onOpenChange={(_, v) => !v.open && !bezig && props.onSluit(false)}>
+      <DialogSurface>
+        <DialogBody>
+          <DialogTitle>Demo dupliceren</DialogTitle>
+          <DialogContent>
+            {props.demo && (
+              <p>
+                Er komt per datum een kopie van “{props.demo.titel}” ({props.demo.planningsstatus.toLowerCase()}, {duurTekst(props.demo.duurMinuten)}
+                {aantalBegeleiders ? ', met ' + (aantalBegeleiders === 1 ? 'dezelfde begeleider' : 'dezelfde ' + aantalBegeleiders + ' begeleiders') : ''}) in
+                deze aanvraag, met eigen afspraken in de agenda.
+              </p>
+            )}
+            <div className={s.lijst} style={{ gap: 8 }}>
+              {rijen.map((r, n) => (
+                <div key={n} className={s.begeleider} style={{ flexWrap: 'wrap' }}>
+                  <Input type="date" aria-label="Datum" value={r.datum} disabled={bezig} onChange={(_, v) => zet(n, 'datum', v.value)} style={{ flex: '1 1 150px' }} />
+                  <Input type="time" aria-label="Begintijd" step={900} value={r.tijd} disabled={bezig} onChange={(_, v) => zet(n, 'tijd', v.value)} style={{ flex: '0 1 110px' }} />
+                  <Button
+                    appearance="subtle"
+                    icon={<DismissRegular />}
+                    aria-label="Datum verwijderen"
+                    disabled={bezig || rijen.length === 1}
+                    onClick={() => setRijen(rijen.filter((_, i) => i !== n))}
+                  />
+                </div>
+              ))}
+            </div>
+            <Button appearance="subtle" icon={<AddRegular />} disabled={bezig} onClick={voegToe} style={{ marginTop: 8 }}>
+              Datum toevoegen
+            </Button>
+            {voortgang && <p>{voortgang}</p>}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => props.onSluit(false)} disabled={bezig}>
+              Annuleren
+            </Button>
+            <Button appearance="primary" icon={<CopyRegular />} disabled={!geldig || bezig} onClick={dupliceer}>
+              {bezig ? 'Bezig…' : rijen.length > 1 ? rijen.length + ' kopieën maken' : 'Dupliceren'}
+            </Button>
+          </DialogActions>
+        </DialogBody>
+      </DialogSurface>
+    </Dialog>
+  );
+}
+
 function Begeleiders(props: {
   demo: Demo;
   inzet: Inzet[];
@@ -425,6 +511,7 @@ export function Demos(props: {
   const [dialoog, setDialoog] = React.useState<{ demo?: Demo; start?: Date } | undefined>();
   const [definitief, setDefinitief] = React.useState<Demo | undefined>();
   const [verplaats, setVerplaats] = React.useState<Demo | undefined>();
+  const [dupliceer, setDupliceer] = React.useState<Demo | undefined>();
   const [ontbrekend, setOntbrekend] = React.useState<Record<number, AfspraakSoort[]>>({});
   const [bezig, voerUit] = useBezig();
   const [bevestigDialoog, bevestig] = useBevestig();
@@ -496,6 +583,9 @@ export function Demos(props: {
                           Definitief maken
                         </MenuItem>
                       )}
+                      <MenuItem icon={<CopyRegular />} onClick={() => setDupliceer(demo)}>
+                        Dupliceren…
+                      </MenuItem>
                       <MenuItem icon={<ArrowForwardRegular />} onClick={() => setVerplaats(demo)}>
                         Verplaatsen naar andere aanvraag…
                       </MenuItem>
@@ -601,6 +691,14 @@ export function Demos(props: {
         onSluit={doel => {
           setVerplaats(undefined);
           if (doel) props.herlaad().catch(() => undefined);
+        }}
+      />
+      <DupliceerDemoDialoog
+        demo={dupliceer}
+        inzet={props.inzet}
+        onSluit={gelukt => {
+          setDupliceer(undefined);
+          if (gelukt) props.herlaad().catch(() => undefined);
         }}
       />
     </div>

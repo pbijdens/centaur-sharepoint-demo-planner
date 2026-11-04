@@ -173,6 +173,7 @@ De SharePoint-lijsten worden benaderd met de eigen SharePoint-rechten van de geb
 | FR-56 | **Synchronisatie (push)**: elke wijziging in de app die invloed heeft op de agenda (datum, tijd, duur, titel, type, deelnemers, borrel, begeleiders, planningsstatus) werkt de drie afspraken direct bij. Opbouw en opruim schuiven mee met de demo. |
 | FR-57 | Bestaat een afspraak niet meer in de agenda (bijvoorbeeld verwijderd in Outlook), dan meldt de app dat en kan de agent hem opnieuw laten aanmaken. |
 | FR-58 | Een demo verwijderen uit de aanvraag verwijdert ook de drie agenda-afspraken (met bevestiging). |
+| FR-59 | **Demo dupliceren**: een demo kan binnen dezelfde aanvraag worden gekopieerd naar één of meer andere datums en tijden. Elke kopie krijgt dezelfde gegevens (titel, duur, type, deelnemers, begeleiders nodig, borrel, wedstrijd, prijsafspraak, notitie en planningsstatus) en dezelfde toegewezen begeleiders, en krijgt direct haar eigen drie agenda-afspraken (FR-50/FR-51). |
 
 ### 4.7 Begeleiders toewijzen
 
@@ -409,6 +410,10 @@ Standaardantwoorden, begeleiders, soorten demo en de handtekening worden via het
 ### UC-20 Demo verplaatsen
 1. De agent kiest bij een demo *Verplaatsen naar andere aanvraag…* en zoekt de aanvraag waar de demo heen moet.
 2. Het systeem verplaatst de demo met inzet en agenda-afspraken en zet bij beide aanvragen een notitie (FR-45).
+
+### UC-21 Demo dupliceren
+1. De agent kiest bij een demo *Dupliceren…* en vult één of meer datums met begintijd in.
+2. Het systeem maakt per datum een kopie van de demo met dezelfde begeleiders binnen dezelfde aanvraag en zet de afspraken in de agenda (FR-59).
 
 ## 8. Schermen (globaal)
 
