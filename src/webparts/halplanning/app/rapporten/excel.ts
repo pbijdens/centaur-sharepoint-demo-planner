@@ -125,12 +125,23 @@ export async function excelExport(rijen: DemoRij[], begeleiders: Begeleider[]): 
   return naarBlob(wb);
 }
 
-/** Factuurlijst: één rij per demo van aanvragen die klaar zijn voor facturatie (FR-78). */
-export async function factuurlijst(rijen: DemoRij[], aanvragenZonderDemo: Aanvraag[]): Promise<Blob> {
+/** Demo's en aanvragen zonder demo voor één werkblad van de factuurlijst. */
+export interface FactuurDeel {
+  rijen: DemoRij[];
+  zonderDemo: Aanvraag[];
+}
+
+/**
+ * Factuurlijst: één rij per demo (FR-78). Aanvragen die klaar zijn voor facturatie en aanvragen die al
+ * gefactureerd zijn staan op aparte werkbladen.
+ */
+export async function factuurlijst(teFactureren: FactuurDeel, gefactureerd: FactuurDeel): Promise<Blob> {
   const wb = await nieuweWerkmap();
-  const waarden = rijen
-    .map(r => klantWaarden(r.aanvraag).concat(demoWaarden(r)))
-    .concat(aanvragenZonderDemo.map(a => klantWaarden(a).concat(demoKolommen().map(() => ''))));
-  blad(wb, 'Factuurlijst', klantKolommen().concat(demoKolommen()), waarden);
+  const waarden = (deel: FactuurDeel): unknown[][] =>
+    deel.rijen
+      .map(r => klantWaarden(r.aanvraag).concat(demoWaarden(r)))
+      .concat(deel.zonderDemo.map(a => klantWaarden(a).concat(demoKolommen().map(() => ''))));
+  blad(wb, 'Te factureren', klantKolommen().concat(demoKolommen()), waarden(teFactureren));
+  blad(wb, 'Gefactureerd', klantKolommen().concat(demoKolommen()), waarden(gefactureerd));
   return naarBlob(wb);
 }

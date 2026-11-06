@@ -31,6 +31,7 @@ const STATUS_KLEUR: Record<Status, BadgeKleur> = {
   'In afwachting': 'warning',
   Bevestigd: 'success',
   'Klaar voor facturatie': 'important',
+  Gefactureerd: 'informative',
   Gesloten: 'subtle',
   Verwijderd: 'danger'
 };
