@@ -17,7 +17,8 @@ import { ArrowDownloadRegular, CopyRegular, ShareRegular } from '@fluentui/react
 import { Diensten, useDiensten } from '../AppContext';
 import { begin, datumKort, datumNumeriek, duurTekst, naarInvoerDatum, plusDagen, tijd, vanInvoer } from '../logic/datum';
 import { begeleiderNamen, borrelLabel, DemoRij, demoRijen, hulpGezocht, komendeDemos } from '../logic/rapportage';
-import { Begeleider } from '../model';
+import { Begeleider, Status } from '../model';
+import type { FactuurDeel } from '../rapporten/excel';
 import { bestandsdatum, deel, download, kanDelen, kanKopieren, kopieer } from '../rapporten/bestanden';
 import { Fout, Laden, useBezig, useGedeeldeStijl } from './algemeen';
 
@@ -88,13 +89,17 @@ export function ExcelDialoog(props: { open: boolean; onSluit: () => void }): JSX
 // ---- Factuurlijst (FR-78) ----
 
 export async function maakFactuurlijst(d: Diensten): Promise<void> {
-  const aanvragen = await d.repo.aanvragen(['Klaar voor facturatie']);
+  const aanvragen = await d.repo.aanvragen(['Klaar voor facturatie', 'Gefactureerd']);
   const demos = (await Promise.all(aanvragen.map(a => d.repo.demos(a.id)))).reduce((alle, x) => alle.concat(x), []);
   const [inzet, begeleiders, demoTypes] = await Promise.all([d.repo.inzetVoorDemos(demos.map(x => x.id)), d.repo.begeleiders(), d.repo.demoTypes()]);
   const rijen = demoRijen({ demos, aanvragen, inzet, begeleiders, demoTypes });
   const zonderDemo = aanvragen.filter(a => !demos.some(x => x.aanvraagId === a.id));
+  const perStatus = (status: Status): FactuurDeel => ({
+    rijen: rijen.filter(r => r.aanvraag?.status === status),
+    zonderDemo: zonderDemo.filter(a => a.status === status)
+  });
   const { factuurlijst } = await import(/* webpackChunkName: 'halplanning-excel' */ '../rapporten/excel');
-  download(await factuurlijst(rijen, zonderDemo), 'Factuurlijst ' + bestandsdatum() + '.xlsx');
+  download(await factuurlijst(perStatus('Klaar voor facturatie'), perStatus('Gefactureerd')), 'Factuurlijst ' + bestandsdatum() + '.xlsx');
 }
 
 // ---- Hulp gezocht / komende demo's als afbeelding (FR-76, FR-77) ----

@@ -5,13 +5,14 @@ export const STATUSSEN = [
   'In afwachting',
   'Bevestigd',
   'Klaar voor facturatie',
+  'Gefactureerd',
   'Gesloten',
   'Verwijderd'
 ] as const;
 export type Status = typeof STATUSSEN[number];
 
 /** Statussen waarbij nieuwe e-mail nog automatisch aan de aanvraag wordt gekoppeld (FR-03). */
-export const OPEN_STATUSSEN: Status[] = ['Nieuw', 'In afwachting', 'Bevestigd', 'Klaar voor facturatie'];
+export const OPEN_STATUSSEN: Status[] = ['Nieuw', 'In afwachting', 'Bevestigd', 'Klaar voor facturatie', 'Gefactureerd'];
 
 export const BORREL_OPTIES = ['geen', 'vooraf', 'achteraf', 'beide', 'patat met snack achteraf', 'onbekend'] as const;
 export type Borrel = typeof BORREL_OPTIES[number];

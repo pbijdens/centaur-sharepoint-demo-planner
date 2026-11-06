@@ -82,7 +82,7 @@ De SharePoint-lijsten worden benaderd met de eigen SharePoint-rechten van de geb
 |---|---|
 | FR-01 | Elke nieuwe e-mail in het Postvak IN van *halplanning* wordt precies één keer verwerkt. Dubbele verwerking wordt voorkomen op basis van `InternetMessageId`. |
 | FR-02 | Koppelregels, in deze volgorde: **(1)** er is een *open* aanvraag met hetzelfde `ConversationId` → bericht toevoegen aan die aanvraag. **(2)** Er is een *open* aanvraag met hetzelfde afzenderadres → bericht toevoegen aan die aanvraag (bij meerdere: de aanvraag met het meest recente bericht). **(3)** Anders → nieuwe aanvraag met status *Nieuw*. |
-| FR-03 | "Open" betekent: status *Nieuw*, *In afwachting*, *Bevestigd* of *Klaar voor facturatie*. Bij *Gesloten* en *Verwijderd* wordt nooit automatisch gekoppeld; er ontstaat dan een nieuwe aanvraag. |
+| FR-03 | "Open" betekent: status *Nieuw*, *In afwachting*, *Bevestigd*, *Klaar voor facturatie* of *Gefactureerd*. Bij *Gesloten* en *Verwijderd* wordt nooit automatisch gekoppeld; er ontstaat dan een nieuwe aanvraag. |
 | FR-04 | Per bericht worden opgeslagen: afzender (naam + adres), ontvangers, onderwerp, ontvangstmoment, HTML-body, `ConversationId`, `InternetMessageId`, Graph-bericht-id, of er bijlagen zijn, en een link om het bericht in Outlook (web) te openen. Bijlagen zelf worden niet opgeslagen. |
 | FR-05 | Na koppelen wordt op de aanvraag `LaatsteBerichtOp` bijgewerkt en `Onbeantwoord` op *ja* gezet. |
 | FR-06 | Bij een nieuwe aanvraag worden Titel, Naam en E-mailadres gevuld met het adres van de afzender. Zodra een agent de aanvraag opent, vervangt de app het adres in Naam en Titel door de naam van de afzender (B10). |
@@ -105,7 +105,7 @@ De SharePoint-lijsten worden benaderd met de eigen SharePoint-rechten van de geb
 
 ### 4.3 Statussen
 
-`Nieuw` → `In afwachting` → `Bevestigd` → `Klaar voor facturatie` → `Gesloten`, plus `Verwijderd`.
+`Nieuw` → `In afwachting` → `Bevestigd` → `Klaar voor facturatie` → `Gefactureerd` → `Gesloten`, plus `Verwijderd`.
 
 | ID | Eis |
 |---|---|
@@ -113,6 +113,7 @@ De SharePoint-lijsten worden benaderd met de eigen SharePoint-rechten van de geb
 | FR-21 | *Verwijderd* is een zachte verwijdering: de aanvraag blijft bewaard en kan teruggezet worden. Na bevestiging worden de agenda-afspraken van alle demo's van de aanvraag **verwijderd**. Wordt de aanvraag later teruggezet, dan kunnen de afspraken opnieuw worden aangemaakt (FR-57). |
 | FR-23 | Bij *Gesloten* blijven de agenda-afspraken staan. |
 | FR-22 | Statuswijzigingen worden vastgelegd (wie, wanneer, van → naar) in de geschiedenis van de aanvraag. |
+| FR-24 | *Gefactureerd* betekent dat de factuur verstuurd is maar de aanvraag nog niet gesloten: er kan nog over de factuur gecorrespondeerd worden, dus nieuwe e-mail wordt nog gekoppeld (FR-03). |
 
 ### 4.4 Aanvraag behandelen
 
@@ -193,11 +194,11 @@ De SharePoint-lijsten worden benaderd met de eigen SharePoint-rechten van de geb
 | FR-73 | Soorten demo | Beheren: naam, volgorde, actief/inactief. |
 | FR-74 | Handtekening | Eén gedeelde handtekening (rich text) bewerken. |
 | FR-80 | Instellingen | Het adres van de gedeelde mailbox instellen en daarna de agenda kiezen uit de agenda's van die mailbox. Daarbij controleert de app of de ingelogde gebruiker toegang heeft tot de mailbox en de agenda. Zolang dit niet is ingesteld, toont de app bij het openen het instellingenscherm. |
-| FR-81 | Installatie op een site | Ontbreken de lijsten op de huidige site, dan biedt de app aan om ze aan te maken, met kolommen, indexen en beginwaarden (zoals de soorten demo). Dit vereist rechten als site-eigenaar; andere gebruikers krijgen een melding dat een eigenaar de app eerst moet installeren. |
+| FR-81 | Installatie op een site | Ontbreken de lijsten op de huidige site (of kolommen, of keuzes in een keuzekolom, zoals een nieuwe status), dan biedt de app aan om ze aan te maken, met kolommen, indexen en beginwaarden (zoals de soorten demo). Dit vereist rechten als site-eigenaar; andere gebruikers krijgen een melding dat een eigenaar de app eerst moet installeren. |
 | FR-75 | Excel-export | Vraagt om een periode (van/tot) en maakt een .xlsx met deze tabbladen: **Demo's** (alle demo's in de periode met alle velden), **Begeleiders**, **Demo × begeleider** (matrix), **Uren per begeleider** (aantal demo's en totale uren), **Demo's per type** (aantal demo's en deelnemers). |
 | FR-76 | Hulp gezocht | Vraagt om het aantal weken (standaard 4) en maakt een **afbeelding** met een tabel van alle demo's vanaf vandaag in die periode die nog onvoldoende begeleiders hebben. Kolommen: datum, tijd, duur, titel, type en aantal deelnemers. De begeleiders die al zijn ingezet staan cursief en iets kleiner onder de titel. Is er een borrel gewenst (alles behalve *geen* en *onbekend*), dan staat dat opvallend achter de titel, omdat niet elke begeleider een borrel kan verzorgen. |
 | FR-77 | Komende demo's | Zoals FR-76 (inclusief begeleiders en borrel), maar met **alle** demo's. Daarbij een eerste kolom met een vinkje als de bezetting compleet is, en een duidelijke markering als er nog hulp nodig is. |
-| FR-78 | Factuurlijst | Download een .xlsx met alle gegevens van alle aanvragen met status *Klaar voor facturatie*: alle klantvelden (§4.5) en alle demovelden (§4.6), inclusief de prijsafspraak en de toegewezen begeleiders. Eén rij per demo. |
+| FR-78 | Factuurlijst | Download een .xlsx met alle gegevens van alle aanvragen met status *Klaar voor facturatie* (werkblad *Te factureren*) en *Gefactureerd* (werkblad *Gefactureerd*): alle klantvelden (§4.5) en alle demovelden (§4.6), inclusief de prijsafspraak en de toegewezen begeleiders. Eén rij per demo. |
 | FR-79 | Afbeeldingen (FR-76/77) kunnen worden **gedeeld** (deelmenu van het toestel, bijvoorbeeld WhatsApp), naar het **klembord gekopieerd** en als **PNG gedownload**. Opties die op het toestel niet beschikbaar zijn, worden verborgen. |
 
 ### 4.9 Later
@@ -242,7 +243,7 @@ Demo >── 1 DemoType
 | Email | tekst | Idx |
 | Telefoon | tekst | |
 | IBAN | tekst | |
-| Status | keuze | Nieuw / In afwachting / Bevestigd / Klaar voor facturatie / Gesloten / Verwijderd — Idx |
+| Status | keuze | Nieuw / In afwachting / Bevestigd / Klaar voor facturatie / Gefactureerd / Gesloten / Verwijderd — Idx |
 | Onbeantwoord | ja/nee | Idx |
 | LaatsteBerichtOp | datum/tijd | Idx, sortering |
 | Bron | keuze | E-mail / Handmatig |
@@ -400,7 +401,7 @@ Standaardantwoorden, begeleiders, soorten demo en de handtekening worden via het
 3. De agent kiest *Delen*, *Kopiëren* of *Downloaden*.
 
 ### UC-18 Factuurlijst
-1. De agent kiest *Factuurlijst*; het systeem maakt een .xlsx met alle aanvragen die *Klaar voor facturatie* zijn.
+1. De agent kiest *Factuurlijst*; het systeem maakt een .xlsx met een werkblad *Te factureren* (aanvragen die *Klaar voor facturatie* zijn) en een werkblad *Gefactureerd* (aanvragen met status *Gefactureerd*).
 
 ### UC-19 Aanvragen samenvoegen
 1. De agent kiest bij een aanvraag *Samenvoegen met…* en zoekt de aanvraag waarin deze moet opgaan.

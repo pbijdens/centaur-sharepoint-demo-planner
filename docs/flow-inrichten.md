@@ -71,7 +71,7 @@ Hieronder staat **`T`** voor de uitvoer van de trigger (`triggerOutputs()?['body
      - Toewijzen (tekstmodus, via het schakelaartje rechts): `concat('Id eq ', item()?['Aanvraag']?['Id'])`
   2. **SharePoint – Items ophalen**, hernoemen naar `Open_aanvraag_conversatie`:
      - Lijstnaam: `Aanvragen`
-     - Filterquery: `(@{join(body('Aanvraag_filters'), ' or ')}) and (Status eq 'Nieuw' or Status eq 'In afwachting' or Status eq 'Bevestigd' or Status eq 'Klaar voor facturatie')`
+     - Filterquery: `(@{join(body('Aanvraag_filters'), ' or ')}) and (Status eq 'Nieuw' or Status eq 'In afwachting' or Status eq 'Bevestigd' or Status eq 'Klaar voor facturatie' or Status eq 'Gefactureerd')`
      - Sorteren op: `LaatsteBerichtOp desc`
      - Maximum aantal: `1`
   3. **Voorwaarde**: `length(body('Open_aanvraag_conversatie')?['value'])` *is groter dan* `0`
@@ -84,7 +84,7 @@ Hieronder staat **`T`** voor de uitvoer van de trigger (`triggerOutputs()?['body
 - **Ja**:
   1. **SharePoint – Items ophalen**, hernoemen naar `Open_aanvraag_afzender`:
      - Lijstnaam: `Aanvragen`
-     - Filterquery: `Email eq '@{replace(triggerOutputs()?['body/from'], '''', '''''')}' and (Status eq 'Nieuw' or Status eq 'In afwachting' or Status eq 'Bevestigd' or Status eq 'Klaar voor facturatie')`
+     - Filterquery: `Email eq '@{replace(triggerOutputs()?['body/from'], '''', '''''')}' and (Status eq 'Nieuw' or Status eq 'In afwachting' or Status eq 'Bevestigd' or Status eq 'Klaar voor facturatie' or Status eq 'Gefactureerd')`
      - Sorteren op: `LaatsteBerichtOp desc`
      - Maximum aantal: `1`
   2. **Voorwaarde**: `length(body('Open_aanvraag_afzender')?['value'])` *is groter dan* `0`

@@ -47,6 +47,18 @@ export function veldXml(v: VeldDef, lookupLijstId?: string): string {
   }
 }
 
+interface BestaandVeld {
+  InternalName: string;
+  Choices?: string[];
+}
+
+/** Keuzes uit het schema die nog niet in de bestaande keuzekolom staan (bijvoorbeeld een nieuwe status). */
+function ontbrekendeKeuzes(veld: VeldDef, bestaand: BestaandVeld): string[] {
+  if (veld.type !== 'keuze') return [];
+  const huidig = bestaand.Choices || [];
+  return (veld.keuzes || []).filter(k => huidig.indexOf(k) < 0);
+}
+
 export class Installatie {
   private readonly webUrl: string;
 
@@ -59,7 +71,8 @@ export class Installatie {
   }
 
   /**
-   * Geeft de lijsten die ontbreken of waarin kolommen ontbreken (bijvoorbeeld na een update van de app).
+   * Geeft de lijsten die ontbreken, waarin kolommen ontbreken of waarin een keuzekolom keuzes mist
+   * (bijvoorbeeld na een update van de app).
    * Een installatie vult beide aan.
    */
   async onvolledigeLijsten(): Promise<LijstSleutel[]> {
@@ -67,10 +80,12 @@ export class Installatie {
       AANMAAKVOLGORDE.map(async sleutel => {
         const def = LIJSTEN[sleutel];
         try {
-          const velden = ((await this.sp.web.getList(this.lijstUrl(def)).fields.select('InternalName')()) as { InternalName: string }[]).map(
-            f => f.InternalName
-          );
-          return def.velden.every(v => velden.indexOf(v.naam) >= 0) ? undefined : sleutel;
+          const velden = await this.velden(def);
+          const compleet = def.velden.every(v => {
+            const b = velden.filter(f => f.InternalName === v.naam)[0];
+            return !!b && ontbrekendeKeuzes(v, b).length === 0;
+          });
+          return compleet ? undefined : sleutel;
         } catch (e) {
           if (foutStatus(e) === 404) return sleutel;
           throw e;
@@ -97,10 +112,20 @@ export class Installatie {
     for (const sleutel of AANMAAKVOLGORDE) {
       const def = LIJSTEN[sleutel];
       const lijst = this.sp.web.getList(this.lijstUrl(def));
-      const bestaand = ((await lijst.fields.select('InternalName')()) as { InternalName: string }[]).map(f => f.InternalName);
+      const bestaand = await this.velden(def);
 
       for (const veld of def.velden) {
-        if (bestaand.indexOf(veld.naam) >= 0) continue;
+        const b = bestaand.filter(f => f.InternalName === veld.naam)[0];
+        if (b) {
+          const nieuw = ontbrekendeKeuzes(veld, b);
+          if (nieuw.length) {
+            voortgang('Keuzes van "' + veld.weergave + '" in "' + def.titel + '" bijwerken…');
+            // Volgorde van het schema aanhouden; keuzes die alleen in de lijst staan blijven achteraan behouden.
+            const keuzes = (veld.keuzes || []).concat((b.Choices || []).filter(k => (veld.keuzes || []).indexOf(k) < 0));
+            await lijst.fields.getByInternalNameOrTitle(veld.naam).update({ Choices: keuzes }, 'SP.FieldChoice');
+          }
+          continue;
+        }
         voortgang('Kolom "' + veld.weergave + '" toevoegen aan "' + def.titel + '"…');
         const doelId = veld.doel ? ids[veld.doel] : undefined;
         await lijst.fields.createFieldAsXml({ SchemaXml: veldXml(veld, doelId), Options: VELD_OPTIES });
@@ -120,6 +145,10 @@ export class Installatie {
       }
     }
     voortgang('Klaar.');
+  }
+
+  private async velden(def: LijstDef): Promise<BestaandVeld[]> {
+    return (await this.sp.web.getList(this.lijstUrl(def)).fields.select('InternalName', 'Choices')()) as BestaandVeld[];
   }
 
   private async zorgVoorLijst(def: LijstDef): Promise<string> {
