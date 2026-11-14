@@ -36,7 +36,8 @@ export type LijstSleutel =
   | 'standaardantwoorden'
   | 'notities'
   | 'statuswijzigingen'
-  | 'instellingen';
+  | 'instellingen'
+  | 'foutmeldingen';
 
 export const LIJSTEN: Record<LijstSleutel, LijstDef> = {
   begeleiders: {
@@ -160,6 +161,20 @@ export const LIJSTEN: Record<LijstSleutel, LijstDef> = {
       { naam: 'VanStatus', weergave: 'Van status', type: 'tekst' },
       { naam: 'NaarStatus', weergave: 'Naar status', type: 'tekst' }
     ]
+  },
+  foutmeldingen: {
+    url: 'Foutmeldingen',
+    titel: 'Foutmeldingen',
+    titleWeergave: 'Melding',
+    velden: [
+      { naam: 'Details', weergave: 'Details', type: 'notitie' },
+      { naam: 'HttpStatus', weergave: 'HTTP-status', type: 'getal' },
+      { naam: 'Verzoek', weergave: 'Verzoek', type: 'notitie' },
+      { naam: 'Scherm', weergave: 'Scherm', type: 'tekst' },
+      { naam: 'AanvraagNr', weergave: 'Aanvraag (nummer)', type: 'getal' },
+      { naam: 'Omgeving', weergave: 'Omgeving', type: 'tekst' },
+      { naam: 'Versie', weergave: 'Versie', type: 'tekst' }
+    ]
   }
 };
 
@@ -174,5 +189,6 @@ export const AANMAAKVOLGORDE: LijstSleutel[] = [
   'demos',
   'inzet',
   'notities',
-  'statuswijzigingen'
+  'statuswijzigingen',
+  'foutmeldingen'
 ];

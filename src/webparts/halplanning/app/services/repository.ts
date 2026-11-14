@@ -477,6 +477,36 @@ export class Repository {
     for (const r of rijen) await this.verwijder(sleutel, num(r, 'Id') as number);
   }
 
+  // ---- Foutmeldingen (NFR-09) ----
+
+  async maakFoutmelding(f: {
+    melding: string;
+    details: string;
+    httpStatus?: number;
+    verzoek: string;
+    scherm: string;
+    aanvraagNr?: number;
+    omgeving: string;
+    versie: string;
+  }): Promise<void> {
+    await this.maak('foutmeldingen', {
+      Title: (f.melding || 'Onbekende fout').slice(0, 255),
+      Details: f.details,
+      HttpStatus: f.httpStatus ?? null,
+      Verzoek: f.verzoek,
+      Scherm: f.scherm.slice(0, 255),
+      AanvraagNr: f.aanvraagNr ?? null,
+      Omgeving: f.omgeving.slice(0, 255),
+      Versie: f.versie.slice(0, 255)
+    });
+  }
+
+  /** Verwijdert foutmeldingen die vóór `grens` zijn gemaakt (definitief, niet naar de prullenbak). */
+  async verwijderFoutmeldingenVoor(grens: Date): Promise<void> {
+    const rijen = await this.lijst('foutmeldingen').items.select('Id').filter('Created lt ' + odata(grens.toISOString())).top(500)();
+    for (const r of rijen as Ruw[]) await this.lijst('foutmeldingen').items.getById(num(r, 'Id') as number).delete();
+  }
+
   // ---- Instellingen ----
 
   async instellingen(): Promise<Instellingen> {

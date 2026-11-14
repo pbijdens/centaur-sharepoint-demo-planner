@@ -20,6 +20,7 @@ import {
   useToastController
 } from '@fluentui/react-components';
 import { Status } from '../model';
+import { logFout } from '../services/foutlogboek';
 import { foutTekst } from '../services/sp';
 
 export const TOASTER_ID = 'halplanning-toaster';
@@ -59,9 +60,11 @@ export function useMelding(): { ok: (tekst: string) => void; fout: (e: unknown) 
         ),
       fout: (e: unknown) => {
         console.error(e);
+        const tekst = typeof e === 'string' ? e : foutTekst(e);
+        logFout(tekst, e);
         dispatchToast(
           <Toast>
-            <ToastTitle>{typeof e === 'string' ? e : foutTekst(e)}</ToastTitle>
+            <ToastTitle>{tekst}</ToastTitle>
           </Toast>,
           { intent: 'error', timeout: 8000 }
         );
@@ -134,9 +137,11 @@ export function Laden(props: { tekst?: string }): JSX.Element {
 }
 
 export function Fout(props: { fout: unknown }): JSX.Element {
+  const tekst = typeof props.fout === 'string' ? props.fout : foutTekst(props.fout);
+  React.useEffect(() => logFout(tekst, props.fout), [props.fout, tekst]);
   return (
     <MessageBar intent="error">
-      <MessageBarBody>{typeof props.fout === 'string' ? props.fout : foutTekst(props.fout)}</MessageBarBody>
+      <MessageBarBody>{tekst}</MessageBarBody>
     </MessageBar>
   );
 }

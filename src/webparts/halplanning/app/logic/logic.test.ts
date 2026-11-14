@@ -2,6 +2,7 @@ import { afsprakenVoorDemo, HELP_GEZOCHT, locatieTekst, plaatsItems, AgendaItem,
 import { naarGraphDatumTijd, vanGraphDatumTijd, vanInvoer, duurTekst } from './datum';
 import { allenBeantwoorden, parseAdressen, splitsCitaat, voegInNaBody, antwoordOnderwerp, naarTekst, antwoordHtml, bodyInhoud, citaatHtml } from './mail';
 import { alleenGewijzigd, conflictVelden, gelijkeWaarde } from './conflict';
+import { bewaarGrens, FoutBegrenzer, foutDetails } from './foutlog';
 import { formatteerIban, isGeldigeIban, isGeldigEmail } from './validatie';
 import { demoRijen, hulpGezocht, komendeDemos, urenPerBegeleider, demosPerType, matrix, RapportBron, borrelLabel, begeleiderNamen } from './rapportage';
 import { demoOverzichtPerAanvraag, LijstDemo, samenvoeging, sorteerAanvragen } from './aanvragen';
@@ -362,5 +363,39 @@ describe('verwijderde afspraken (FR-57)', () => {
     const langer = verschuiving({ start: t, duurMinuten: 60 }, { start: t, duurMinuten: 90 });
     expect(opnieuwAanmaken('opbouwen', false, langer)).toBe(false);
     expect(opnieuwAanmaken('opruimen', false, langer)).toBe(true);
+  });
+});
+
+describe('foutlog', () => {
+  test('bewaarGrens ligt 4 weken terug', () => {
+    expect(bewaarGrens(new Date('2026-11-14T12:00:00Z')).toISOString()).toBe('2026-10-17T12:00:00.000Z');
+  });
+
+  test('foutDetails van een HTTP-fout (PnPjs)', () => {
+    const e = Object.assign(new Error('Precondition failed'), { status: 412, response: { status: 412, url: 'https://x/_api/items(1)' } });
+    const d = foutDetails(e);
+    expect(d.status).toBe(412);
+    expect(d.verzoek).toBe('https://x/_api/items(1)');
+    expect(d.details).toContain('HTTP-status: 412');
+    expect(d.details).toContain('Bericht: Precondition failed');
+  });
+
+  test('foutDetails van een Graph-fout en een tekst', () => {
+    const d = foutDetails({ statusCode: 404, code: 'ErrorItemNotFound', requestId: 'abc', message: 'Not found', body: '{"x":1}' });
+    expect(d.status).toBe(404);
+    expect(d.details).toContain('Code: ErrorItemNotFound');
+    expect(d.details).toContain('Request-id: abc');
+    expect(d.details).toContain('Antwoord: {"x":1}');
+    expect(foutDetails('Vul minimaal één ontvanger in.')).toEqual({ verzoek: '', details: 'Vul minimaal één ontvanger in.' });
+  });
+
+  test('FoutBegrenzer: geen herhaling binnen 10 s en hooguit 20 per minuut', () => {
+    const b = new FoutBegrenzer();
+    expect(b.mag('a', 0)).toBe(true);
+    expect(b.mag('a', 5000)).toBe(false);
+    expect(b.mag('a', 11000)).toBe(true);
+    for (let i = 0; i < 18; i++) expect(b.mag('x' + i, 12000)).toBe(true);
+    expect(b.mag('y', 12000)).toBe(false);
+    expect(b.mag('y', 61000)).toBe(true);
   });
 });
