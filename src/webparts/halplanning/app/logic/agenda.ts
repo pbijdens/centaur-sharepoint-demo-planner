@@ -16,6 +16,31 @@ import { escapeHtml } from './mail';
 export type AfspraakSoort = 'opbouwen' | 'demo' | 'opruimen';
 export const AFSPRAAKSOORTEN: AfspraakSoort[] = ['opbouwen', 'demo', 'opruimen'];
 
+/** Wat er bij een wijziging van de demo is verschoven; bepaalt of een verwijderde rand-afspraak terugkomt. */
+export interface Verschuiving {
+  start: boolean;
+  eind: boolean;
+}
+
+export function verschuiving(oud: Pick<Demo, 'start' | 'duurMinuten'>, nieuw: Pick<Demo, 'start' | 'duurMinuten'>): Verschuiving {
+  return {
+    start: oud.start.getTime() !== nieuw.start.getTime(),
+    eind: eindVan(oud).getTime() !== eindVan(nieuw).getTime()
+  };
+}
+
+/**
+ * Moet een afspraak die niet meer in de agenda staat opnieuw worden aangemaakt (FR-57)? De demo-afspraak altijd.
+ * Opbouwen en opruimen worden soms bewust verwijderd (aansluitende demo's); die komen alleen terug als de agent
+ * daarom vraagt (`herstel`) of als hun tijdvak verschuift: opbouwen bij een nieuwe starttijd, opruimen bij een
+ * nieuwe eindtijd.
+ */
+export function opnieuwAanmaken(soort: AfspraakSoort, herstel: boolean, v?: Verschuiving): boolean {
+  if (soort === 'demo' || herstel) return true;
+  if (!v) return false;
+  return soort === 'opbouwen' ? v.start : v.eind;
+}
+
 /** Graph-eventvelden die de app beheert. */
 export interface EventPayload {
   subject: string;

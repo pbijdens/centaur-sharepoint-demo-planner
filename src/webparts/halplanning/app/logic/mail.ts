@@ -1,5 +1,7 @@
 // E-mailhulpfuncties: adressen, allen beantwoorden (FR-32), geciteerde tekst (FR-30).
 
+import { datumLang, tijd } from './datum';
+
 /** Haalt e-mailadressen uit een tekst als "a@x.nl; Jan <b@y.nl>, c@z.nl". */
 export function parseAdressen(tekst: string): string[] {
   if (!tekst) return [];
@@ -126,4 +128,50 @@ export function antwoordHtml(tekstHtml: string, handtekeningHtml: string): strin
 /** "Re: " voor een onderwerp als dat er nog niet staat. */
 export function antwoordOnderwerp(onderwerp: string): string {
   return /^\s*(re|antw|aw)\s*:/i.test(onderwerp || '') ? onderwerp : 'Re: ' + (onderwerp || '');
+}
+
+/** De inhoud van <body> uit een volledig HTML-document, zonder <head>, stijlen en scripts. */
+export function bodyInhoud(html: string): string {
+  let h = html || '';
+  const body = /<body[^>]*>([\s\S]*?)(<\/body>|$)/i.exec(h);
+  if (body) h = body[1];
+  return h
+    .replace(/<head[\s\S]*?<\/head>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<\/?(html|body|meta|link)[^>]*>/gi, '')
+    .trim();
+}
+
+export interface TeCiterenBericht {
+  vanNaam: string;
+  vanAdres: string;
+  aan: string;
+  cc: string;
+  onderwerp: string;
+  ontvangenOp?: Date;
+  body: string;
+}
+
+/**
+ * Het oorspronkelijke bericht als citaat onder een antwoord, zoals Outlook dat doet. Voor een antwoord dat als
+ * nieuwe mail gaat omdat het oorspronkelijke bericht niet meer in de mailbox staat (FR-32).
+ */
+export function citaatHtml(b: TeCiterenBericht): string {
+  const van = b.vanNaam && b.vanNaam !== b.vanAdres ? b.vanNaam + ' <' + b.vanAdres + '>' : b.vanAdres;
+  const regels: [string, string][] = [['Van', van]];
+  if (b.ontvangenOp) regels.push(['Verzonden', datumLang(b.ontvangenOp) + ' ' + tijd(b.ontvangenOp)]);
+  if (b.aan) regels.push(['Aan', b.aan]);
+  if (b.cc) regels.push(['CC', b.cc]);
+  regels.push(['Onderwerp', b.onderwerp]);
+  const kop = regels.map(([k, v]) => '<b>' + k + ':</b> ' + escapeHtml(v)).join('<br>');
+  return (
+    '<div><br></div><hr style="display:inline-block;width:98%" tabindex="-1">' +
+    '<div id="divRplyFwdMsg" dir="ltr"><font face="Calibri, sans-serif" style="font-size:11pt" color="#000000">' +
+    kop +
+    '</font><div>&nbsp;</div></div>' +
+    '<div>' +
+    bodyInhoud(b.body) +
+    '</div>'
+  );
 }
