@@ -38,6 +38,7 @@ import { useDiensten } from '../AppContext';
 import { Aanvraag, Begeleider, Bericht, Demo, DemoType, Inzet, Status, STATUSSEN } from '../model';
 import { AanvraagKiezer } from './AanvraagKiezer';
 import { Fout, Laden, StatusBadge, useBevestig, useBezig, useGedeeldeStijl } from './algemeen';
+import { zetFoutContext } from '../services/foutlogboek';
 import { Conversatie } from './Conversatie';
 import { Dagweergave } from './Dagweergave';
 import { Demos } from './Demos';
@@ -131,6 +132,7 @@ export function AanvraagDetail(props: { id: number; terug: () => void; open: (id
   const [gegevens, setGegevens] = React.useState<Gegevens | undefined>();
   const [fout, setFout] = React.useState<unknown>();
   const [tab, setTab] = React.useState<TabNaam>('conversatie');
+  React.useEffect(() => zetFoutContext({ tabblad: tab }), [tab]);
   const [planStart, setPlanStart] = React.useState<Date | undefined>();
   const [voorstel, setVoorstel] = React.useState<{ status: Status; reden: string } | undefined>();
   const [bezig, voerUit] = useBezig();

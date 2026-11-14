@@ -16,6 +16,7 @@ import {
 
 import { App } from './app/App';
 import { Basis } from './app/AppContext';
+import { startFoutLogboek } from './app/services/foutlogboek';
 import { Installatie } from './app/services/installatie';
 import { Repository } from './app/services/repository';
 import { maakSp } from './app/services/sp';
@@ -52,9 +53,11 @@ export default class HalplanningWebPart extends BaseClientSideWebPart<IHalplanni
     };
 
     const teams = this.context.sdks.microsoftTeams;
+    let omgeving = teams ? 'Teams' : 'SharePoint';
     if (teams) {
       try {
         const ctx = await teams.teamsJs.app.getContext();
+        omgeving = 'Teams (' + ctx.app.host.clientType + ')';
         this._thema = this._teamsThema(ctx.app.theme);
         teams.teamsJs.app.registerOnThemeChangeHandler(thema => {
           this._thema = this._teamsThema(thema);
@@ -64,6 +67,7 @@ export default class HalplanningWebPart extends BaseClientSideWebPart<IHalplanni
         this._thema = teamsLightTheme;
       }
     }
+    startFoutLogboek(this._basis.repo, { omgeving, versie: this.manifest.version });
   }
 
   private _teamsThema(naam: string): Theme {

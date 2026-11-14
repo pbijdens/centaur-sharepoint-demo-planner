@@ -45,6 +45,7 @@ import { AanvraagLijst } from './components/AanvraagLijst';
 import { Fout, Laden, TOASTER_ID, useBezig } from './components/algemeen';
 import { BeheerBegeleiders, BeheerDemoTypes, BeheerStandaardantwoorden, HandtekeningScherm } from './components/Beheer';
 import { InstallatieScherm, InstellingenScherm } from './components/Instellingen';
+import { zetFoutContext } from './services/foutlogboek';
 import { ExcelDialoog, LijstDialoog, maakFactuurlijst } from './components/Rapporten';
 
 type Scherm =
@@ -157,6 +158,10 @@ function Hoofdscherm(): JSX.Element {
   const [lijst, setLijst] = React.useState<'hulp' | 'komend' | undefined>();
   const [bezig, voerUit] = useBezig();
   const naarLijst = (): void => setScherm({ s: 'lijst' });
+
+  React.useEffect(() => {
+    zetFoutContext({ scherm: scherm.s, aanvraagId: scherm.s === 'aanvraag' ? scherm.id : undefined }, true);
+  }, [scherm]);
 
   return (
     <>

@@ -221,6 +221,7 @@ De SharePoint-lijsten worden benaderd met de eigen SharePoint-rechten van de geb
 | NFR-06 | De HTML van e-mails wordt vóór weergave opgeschoond (sanitizing), zodat er geen scripts of externe trackers worden uitgevoerd. |
 | NFR-07 | Prestaties: het startscherm laadt binnen 3 seconden bij 1.000 open aanvragen. De lijsten zijn geïndexeerd op de kolommen waarop gefilterd wordt (zie §6). Houd rekening met de drempel van 5.000 items per lijstweergave. |
 | NFR-08 | Alle documentatie is in het Nederlands. |
+| NFR-09 | **Foutenlogboek**: elke fout die de app aan een gebruiker toont (melding onderaan of foutbalk), komt in de lijst *Foutmeldingen* met context: de getoonde melding, technische details (HTTP-status, foutcode, request-id, stack), het mislukte verzoek, het scherm en tabblad, het nummer van de aanvraag, de omgeving (Teams-client of SharePoint), de versie van de app en de browser. Gebruiker en tijdstip komen uit de systeemkolommen. Dezelfde melding wordt hooguit eens per 10 seconden vastgelegd en in totaal hooguit 20 per minuut. Fouten bij het schrijven naar deze lijst worden niet getoond en niet opnieuw vastgelegd (geen lus). Bij elke nieuwe foutmelding verwijdert de app foutmeldingen die ouder zijn dan 4 weken. |
 
 ## 6. Gegevensmodel (SharePoint-lijsten)
 
@@ -307,6 +308,9 @@ Aanvraag (lookup, Idx), VanStatus, NaarStatus. Wie en wanneer komen uit de syste
 
 ### Instellingen
 Title (sleutel), Waarde (meerregelig). Sleutels: `Handtekening`, `MailboxAdres`, `AgendaId` (Graph-id van de gekozen agenda in de mailbox), `AgendaNaam` (alleen voor weergave).
+
+### Foutmeldingen
+Title (getoonde melding), Details (meerregelig), HttpStatus, Verzoek (meerregelig), Scherm, AanvraagNr (getal, geen lookup, zodat een verwijderde aanvraag niets blokkeert), Omgeving, Versie. Wie en wanneer komen uit de systeemkolommen. Items ouder dan 4 weken worden automatisch verwijderd (NFR-09).
 
 Koppelregel 1 (zelfde conversatie) zoekt via `Berichten.ConversationId` naar de aanvraag; een aparte kolom op *Aanvragen* is daarvoor niet nodig.
 
