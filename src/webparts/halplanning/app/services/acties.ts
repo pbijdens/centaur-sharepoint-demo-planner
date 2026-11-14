@@ -1,9 +1,9 @@
 // Samengestelde acties die SharePoint en Graph combineren.
 
-import { afsprakenVoorDemo, AfspraakSoort, AFSPRAAKSOORTEN } from '../logic/agenda';
+import { afsprakenVoorDemo, AfspraakSoort, AFSPRAAKSOORTEN, opnieuwAanmaken, Verschuiving, verschuiving } from '../logic/agenda';
 import { samenvoeging } from '../logic/aanvragen';
 import { datumTijdKort } from '../logic/datum';
-import { antwoordHtml, parseAdressen } from '../logic/mail';
+import { antwoordHtml, antwoordOnderwerp, citaatHtml, parseAdressen } from '../logic/mail';
 import {
   Aanvraag,
   Bericht,
@@ -39,12 +39,12 @@ export class Acties {
   async wijzigStatus(aanvraag: Aanvraag, naar: Status): Promise<void> {
     if (aanvraag.status === naar) return;
     if (naar === 'Verwijderd') await this.verwijderAfsprakenVanAanvraag(aanvraag.id);
-    await this.repo.wijzigAanvraag(aanvraag.id, { status: naar }, aanvraag.etag);
+    await this.repo.wijzigAanvraag(aanvraag.id, { status: naar }, aanvraag);
     await this.repo.logStatuswijziging(aanvraag.id, aanvraag.status, naar);
   }
 
   async markeerVerwerkt(aanvraag: Aanvraag, verwerkt: boolean = true): Promise<void> {
-    await this.repo.wijzigAanvraag(aanvraag.id, { onbeantwoord: !verwerkt }, aanvraag.etag);
+    await this.repo.wijzigAanvraag(aanvraag.id, { onbeantwoord: !verwerkt }, aanvraag);
   }
 
   // ---- Demo's en agenda ----
@@ -65,10 +65,11 @@ export class Acties {
   }
 
   /**
-   * Zet de drie afspraken van een demo gelijk met de gegevens in de app (push, FR-56). Ontbrekende afspraken
-   * worden alleen opnieuw aangemaakt als `herstel` aan staat (FR-57).
+   * Zet de drie afspraken van een demo gelijk met de gegevens in de app (push, FR-56). Een verwijderde
+   * demo-afspraak komt altijd terug; verwijderde opbouw- en opruimafspraken alleen met `herstel` of als hun
+   * tijdvak verschuift (`verschoven`, FR-57). De rest wordt gemeld als ontbrekend.
    */
-  async synchroniseerDemo(demoId: number, herstel: boolean = false): Promise<SyncResultaat> {
+  async synchroniseerDemo(demoId: number, herstel: boolean = false, verschoven?: Verschuiving): Promise<SyncResultaat> {
     const demo = await this.repo.demo(demoId);
     const ctx = await this.demoContext(demo);
     const payloads = afsprakenVoorDemo({ demo, ...ctx });
@@ -81,7 +82,7 @@ export class Acties {
       if (id) {
         const bestaat = await this.graph.wijzigAfspraak(id, payloads[soort]);
         if (bestaat) continue;
-        if (!herstel) {
+        if (!opnieuwAanmaken(soort, herstel, verschoven)) {
           ontbrekend.push(soort);
           continue;
         }
@@ -145,8 +146,9 @@ export class Acties {
 
   /** Wijzigt een demo en werkt de agenda bij. */
   async wijzigDemo(demo: Demo, wijziging: Partial<Demo>): Promise<SyncResultaat> {
-    await this.repo.wijzigDemo(demo.id, wijziging, demo.etag);
-    return this.synchroniseerDemo(demo.id);
+    await this.repo.wijzigDemo(demo.id, wijziging, demo);
+    const nieuw = { start: wijziging.start || demo.start, duurMinuten: wijziging.duurMinuten || demo.duurMinuten };
+    return this.synchroniseerDemo(demo.id, false, verschuiving(demo, nieuw));
   }
 
   /** Definitief maken (FR-51). */
@@ -187,19 +189,27 @@ export class Acties {
 
   // ---- E-mail ----
 
-  /** Verstuurt een antwoord of nieuwe mail vanuit de gedeelde mailbox en legt het vast (FR-32 t/m FR-36). */
+  /**
+   * Verstuurt een antwoord of nieuwe mail vanuit de gedeelde mailbox en legt het vast (FR-32 t/m FR-36). Staat het
+   * oorspronkelijke bericht niet meer in de mailbox, dan gaat het antwoord als nieuwe mail met het opgeslagen
+   * bericht als citaat (FR-32); `alsNieuweMail` is dan true.
+   */
   async verstuur(
     aanvraag: Aanvraag,
     opInkomend: Bericht | undefined,
     v: { aan: string; cc: string; onderwerp: string; tekstHtml: string; handtekening: string }
-  ): Promise<void> {
+  ): Promise<{ alsNieuweMail: boolean }> {
     const aan = parseAdressen(v.aan);
     const cc = parseAdressen(v.cc);
     if (aan.length === 0) throw new Error('Vul minimaal één ontvanger in.');
     const html = antwoordHtml(v.tekstHtml, v.handtekening);
-    const verzonden = opInkomend
-      ? await this.graph.beantwoord(opInkomend.internetMessageId, html, aan, cc)
-      : await this.graph.nieuweMail(v.onderwerp, html, aan, cc);
+    let verzonden = opInkomend ? await this.graph.beantwoord(opInkomend.internetMessageId, html, aan, cc) : undefined;
+    const alsNieuweMail = !!opInkomend && !verzonden;
+    if (!verzonden) {
+      verzonden = opInkomend
+        ? await this.graph.nieuweMail(antwoordOnderwerp(opInkomend.onderwerp), html + citaatHtml(opInkomend), aan, cc)
+        : await this.graph.nieuweMail(v.onderwerp, html, aan, cc);
+    }
 
     await this.repo.maakBericht({
       aanvraagId: aanvraag.id,
@@ -219,6 +229,7 @@ export class Acties {
       verstuurdDoor: this.gebruikersnaam
     });
     await this.repo.wijzigAanvraag(aanvraag.id, { onbeantwoord: false });
+    return { alsNieuweMail };
   }
 
   /** Haalt naam van de afzender en de Outlook-link op via Graph en slaat die op bij het bericht. */
@@ -262,7 +273,7 @@ export class Acties {
     if (demo.aanvraagId === doelId) throw new Error('De demo hoort al bij deze aanvraag.');
     const doel = await this.repo.aanvraag(doelId);
     if (doel.status === 'Verwijderd') throw new Error('Een demo verplaatsen naar een verwijderde aanvraag kan niet.');
-    await this.repo.wijzigDemo(demo.id, { aanvraagId: doelId }, demo.etag);
+    await this.repo.wijzigDemo(demo.id, { aanvraagId: doelId }, demo);
     const wat = 'Demo “' + demo.titel + '” van ' + datumTijdKort(demo.start);
     const titel = (a: Aanvraag): string => '“' + (a.titel || a.naam || a.email || 'zonder titel') + '”';
     await this.repo.maakNotitie(van.id, wat + ' is verplaatst naar aanvraag ' + titel(doel) + '.');
@@ -297,7 +308,7 @@ export class Acties {
     await this.repo.verplaatsNaarAanvraag('statuswijzigingen', bron.id, doelId);
 
     melding('Gegevens bijwerken…');
-    if (Object.keys(wijziging).length) await this.repo.wijzigAanvraag(doelId, wijziging, doel.etag);
+    if (Object.keys(wijziging).length) await this.repo.wijzigAanvraag(doelId, wijziging, doel);
     await this.repo.maakNotitie(doelId, notitie);
     await this.repo.verwijderAanvraag(bron.id);
   }

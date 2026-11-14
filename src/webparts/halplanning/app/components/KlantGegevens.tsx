@@ -29,7 +29,7 @@ export function KlantGegevens(props: { aanvraag: Aanvraag; herlaad: () => Promis
 
   const bewaar = async (): Promise<void> => {
     const ok = await voerUit(async () => {
-      await d.repo.wijzigAanvraag(a.id, { ...v, iban: v.iban && isGeldigeIban(v.iban) ? formatteerIban(v.iban) : v.iban }, a.etag);
+      await d.repo.wijzigAanvraag(a.id, { ...v, iban: v.iban && isGeldigeIban(v.iban) ? formatteerIban(v.iban) : v.iban }, a);
       return true;
     }, 'Gegevens opgeslagen');
     if (ok) await props.herlaad();

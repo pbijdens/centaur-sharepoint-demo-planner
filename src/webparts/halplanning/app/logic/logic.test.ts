@@ -1,6 +1,7 @@
-import { afsprakenVoorDemo, HELP_GEZOCHT, locatieTekst, plaatsItems, AgendaItem } from './agenda';
+import { afsprakenVoorDemo, HELP_GEZOCHT, locatieTekst, plaatsItems, AgendaItem, opnieuwAanmaken, verschuiving } from './agenda';
 import { naarGraphDatumTijd, vanGraphDatumTijd, vanInvoer, duurTekst } from './datum';
-import { allenBeantwoorden, parseAdressen, splitsCitaat, voegInNaBody, antwoordOnderwerp, naarTekst, antwoordHtml } from './mail';
+import { allenBeantwoorden, parseAdressen, splitsCitaat, voegInNaBody, antwoordOnderwerp, naarTekst, antwoordHtml, bodyInhoud, citaatHtml } from './mail';
+import { alleenGewijzigd, conflictVelden, gelijkeWaarde } from './conflict';
 import { formatteerIban, isGeldigeIban, isGeldigEmail } from './validatie';
 import { demoRijen, hulpGezocht, komendeDemos, urenPerBegeleider, demosPerType, matrix, RapportBron, borrelLabel, begeleiderNamen } from './rapportage';
 import { demoOverzichtPerAanvraag, LijstDemo, samenvoeging, sorteerAanvragen } from './aanvragen';
@@ -282,5 +283,84 @@ describe('aanvragen', () => {
     expect(s.notitie).toContain('“Vraag”');
     expect(s.notitie).toContain('E-mailadres: j@y.nl');
     expect(s.notitie).not.toContain('Naam:');
+  });
+});
+
+describe('conflict', () => {
+  interface X { a?: string; b?: number; c?: Date; etag?: string }
+  const t1 = new Date('2026-12-06T12:30:00Z');
+
+  test('gelijkeWaarde: leeg en datums', () => {
+    expect(gelijkeWaarde(undefined, '')).toBe(true);
+    expect(gelijkeWaarde(null, 0)).toBe(false);
+    expect(gelijkeWaarde(t1, new Date(t1.getTime()))).toBe(true);
+    expect(gelijkeWaarde(t1, new Date(t1.getTime() + 1))).toBe(false);
+  });
+
+  test('alleenGewijzigd laat ongewijzigde velden weg', () => {
+    const orig: X = { a: 'x', b: 1, c: t1 };
+    expect(alleenGewijzigd<X>({ a: 'x', b: 2, c: new Date(t1.getTime()) }, orig)).toEqual({ b: 2 });
+  });
+
+  test('geen conflict als een ander alleen andere velden wijzigde (flow, synchronisatie)', () => {
+    const orig: X = { a: 'x', b: 1, etag: '1' };
+    const actueel: X = { a: 'x', b: 1, c: t1, etag: '2' };
+    expect(conflictVelden<X>({ a: 'y' }, orig, actueel)).toEqual([]);
+  });
+
+  test('geen conflict als het veld al de gewenste waarde heeft (eerdere poging gelukt)', () => {
+    expect(conflictVelden<X>({ a: 'y' }, { a: 'x' }, { a: 'y' })).toEqual([]);
+  });
+
+  test('conflict als een ander hetzelfde veld anders wijzigde', () => {
+    expect(conflictVelden<X>({ a: 'y' }, { a: 'x' }, { a: 'z' })).toEqual(['a']);
+  });
+});
+
+describe('citaat', () => {
+  test('bodyInhoud haalt head en stijlen weg', () => {
+    expect(bodyInhoud('<html><head><style>p{}</style></head><body class="x"><p>Hoi</p></body></html>')).toBe('<p>Hoi</p>');
+    expect(bodyInhoud('<p>Los</p>')).toBe('<p>Los</p>');
+  });
+
+  test('citaatHtml bevat kop en oorspronkelijke tekst', () => {
+    const h = citaatHtml({
+      vanNaam: 'Jan <test>',
+      vanAdres: 'jan@x.nl',
+      aan: 'halplanning@x.nl',
+      cc: '',
+      onderwerp: 'Demo',
+      ontvangenOp: new Date('2026-11-10T10:00:00Z'),
+      body: '<html><body><p>Vraag</p></body></html>'
+    });
+    expect(h).toContain('Jan &lt;test&gt; &lt;jan@x.nl&gt;');
+    expect(h).toContain('<b>Onderwerp:</b> Demo');
+    expect(h).toContain('<p>Vraag</p>');
+    expect(h).not.toContain('<b>CC:</b>');
+  });
+});
+
+describe('verwijderde afspraken (FR-57)', () => {
+  const t = new Date('2026-12-06T12:30:00Z');
+  const later = new Date('2026-12-06T13:30:00Z');
+
+  test('demo-afspraak komt altijd terug', () => {
+    expect(opnieuwAanmaken('demo', false)).toBe(true);
+  });
+
+  test('opbouwen en opruimen niet zonder verschuiving of herstel', () => {
+    const v = verschuiving({ start: t, duurMinuten: 60 }, { start: t, duurMinuten: 60 });
+    expect(opnieuwAanmaken('opbouwen', false, v)).toBe(false);
+    expect(opnieuwAanmaken('opruimen', false, v)).toBe(false);
+    expect(opnieuwAanmaken('opruimen', true, v)).toBe(true);
+  });
+
+  test('verplaatsen brengt beide terug, alleen langer maken alleen opruimen', () => {
+    const verplaatst = verschuiving({ start: t, duurMinuten: 60 }, { start: later, duurMinuten: 60 });
+    expect(opnieuwAanmaken('opbouwen', false, verplaatst)).toBe(true);
+    expect(opnieuwAanmaken('opruimen', false, verplaatst)).toBe(true);
+    const langer = verschuiving({ start: t, duurMinuten: 60 }, { start: t, duurMinuten: 90 });
+    expect(opnieuwAanmaken('opbouwen', false, langer)).toBe(false);
+    expect(opnieuwAanmaken('opruimen', false, langer)).toBe(true);
   });
 });

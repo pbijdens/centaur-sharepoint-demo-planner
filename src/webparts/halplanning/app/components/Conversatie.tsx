@@ -194,6 +194,7 @@ function AntwoordPaneel(props: { aanvraag: Aanvraag; laatsteInkomend?: Bericht; 
   const [tekst, setTekst] = React.useState('');
   const [standaard, setStandaard] = React.useState<Standaardantwoord[]>([]);
   const [bezig, voerUit] = useBezig();
+  const melding = useMelding();
 
   const begin = React.useMemo(() => {
     if (props.laatsteInkomend) {
@@ -214,17 +215,22 @@ function AntwoordPaneel(props: { aanvraag: Aanvraag; laatsteInkomend?: Bericht; 
   const verstuur = async (): Promise<void> => {
     const html = editor.current ? editor.current.html() : tekst;
     if (!html || html === '<p></p>') return;
-    const ok = await voerUit(async () => {
-      await d.acties.verstuur(props.aanvraag, props.laatsteInkomend, {
+    const r = await voerUit(() =>
+      d.acties.verstuur(props.aanvraag, props.laatsteInkomend, {
         aan,
         cc,
         onderwerp,
         tekstHtml: html,
         handtekening: schoonInvoer(d.instellingen.handtekening)
-      });
-      return true;
-    }, 'Verzonden');
-    if (ok) props.onVerzonden();
+      })
+    );
+    if (!r) return;
+    melding.ok(
+      r.alsNieuweMail
+        ? 'Verzonden als nieuwe mail met het oorspronkelijke bericht als citaat (dat staat niet meer in de mailbox)'
+        : 'Verzonden'
+    );
+    props.onVerzonden();
   };
 
   return (

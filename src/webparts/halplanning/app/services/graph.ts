@@ -81,9 +81,11 @@ export class GraphService {
   /** Zoekt een bericht op InternetMessageId (stabiel, ook als het bericht naar een andere map is verplaatst). */
   async zoekBericht(internetMessageId: string): Promise<GraphBericht | undefined> {
     if (!internetMessageId) return undefined;
+    // Zelf coderen: de Graph-client codeert $filter niet, waardoor bijvoorbeeld een '+' (komt veel voor in
+    // id's van Gmail) als spatie aankomt en het bericht niet wordt gevonden.
+    const filter = "internetMessageId eq '" + internetMessageId.replace(/'/g, "''") + "'";
     const r = await this.client
-      .api(this.mb + '/messages')
-      .filter("internetMessageId eq '" + internetMessageId.replace(/'/g, "''") + "'")
+      .api(this.mb + '/messages?$filter=' + encodeURIComponent(filter))
       .select('id,webLink,conversationId,internetMessageId,hasAttachments,from')
       .top(1)
       .get();
@@ -92,11 +94,12 @@ export class GraphService {
 
   /**
    * Verstuurt "allen beantwoorden" op een bestaand bericht, vanuit de gedeelde mailbox. De agent heeft de
-   * ontvangers al bepaald; de tekst komt boven de geciteerde oorspronkelijke mail.
+   * ontvangers al bepaald; de tekst komt boven de geciteerde oorspronkelijke mail. Geeft undefined als het
+   * oorspronkelijke bericht niet (meer) in de mailbox staat; er is dan niets verstuurd.
    */
-  async beantwoord(internetMessageId: string, html: string, aan: string[], cc: string[]): Promise<VerzondenBericht> {
+  async beantwoord(internetMessageId: string, html: string, aan: string[], cc: string[]): Promise<VerzondenBericht | undefined> {
     const origineel = await this.zoekBericht(internetMessageId);
-    if (!origineel) throw new Error('Het oorspronkelijke bericht is niet gevonden in de gedeelde mailbox.');
+    if (!origineel) return undefined;
     const concept = (await this.client.api(this.mb + '/messages/' + origineel.id + '/createReplyAll').post({})) as GraphBericht;
     try {
       await this.client.api(this.mb + '/messages/' + concept.id).patch({
@@ -184,14 +187,22 @@ export class GraphService {
     return e.id;
   }
 
-  /** Werkt een afspraak bij. Geeft false als de afspraak niet meer bestaat (FR-57). */
+  /**
+   * Werkt een afspraak bij. De app is eigenaar van de afspraak (FR-56): er is geen controle op wijzigingen in
+   * Outlook, de gegevens uit de app overschrijven alles. Geeft false als de afspraak niet meer bestaat (FR-57).
+   */
   async wijzigAfspraak(id: string, payload: EventPayload): Promise<boolean> {
-    try {
-      await this.client.api(this.mb + '/events/' + encodeURIComponent(id)).patch(payload);
-      return true;
-    } catch (e) {
-      if (foutStatus(e) === 404) return false;
-      throw e;
+    for (let poging = 1; ; poging++) {
+      try {
+        await this.client.api(this.mb + '/events/' + encodeURIComponent(id)).patch(payload);
+        return true;
+      } catch (e) {
+        const status = foutStatus(e);
+        if (status === 404) return false;
+        // Exchange meldt soms een conflict als de afspraak net in Outlook is gewijzigd; opnieuw proberen overschrijft.
+        if ((status === 409 || status === 412) && poging < 3) continue;
+        throw e;
+      }
     }
   }
 

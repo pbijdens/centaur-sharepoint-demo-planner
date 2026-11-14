@@ -5,6 +5,8 @@ import { SPFI } from '@pnp/sp';
 import { IList } from '@pnp/sp/lists';
 import { LIJSTEN, LijstSleutel } from '../lists';
 import { LijstDemo } from '../logic/aanvragen';
+import { alleenGewijzigd, conflictVelden } from '../logic/conflict';
+import { foutStatus } from './sp';
 import {
   Aanvraag,
   Begeleider,
@@ -181,6 +183,35 @@ export class Repository {
     await this.lijst(sleutel).items.getById(id).update(velden, etagWaarde || '*');
   }
 
+  /**
+   * Wijzigt een item met ETag-controle (NFR-05). Alleen de velden die afwijken van `origineel` (de versie waarop de
+   * gebruiker begon) gaan mee. Is het item intussen gewijzigd, dan wordt de actuele versie gelezen; heeft niemand
+   * juist die velden anders gewijzigd, dan volgt een nieuwe poging op de actuele ETag. Anders blijft de 412 staan.
+   */
+  private async wijzigMetControle<T extends { etag?: string }>(
+    sleutel: LijstSleutel,
+    id: number,
+    wijziging: Partial<T>,
+    origineel: T,
+    lees: () => Promise<T>,
+    naarVelden: (w: Partial<T>) => Ruw
+  ): Promise<void> {
+    const echt = alleenGewijzigd(wijziging, origineel);
+    if (Object.keys(echt).length === 0) return;
+    let etagWaarde = origineel.etag;
+    for (let poging = 1; ; poging++) {
+      try {
+        await this.wijzig(sleutel, id, naarVelden(echt), etagWaarde);
+        return;
+      } catch (e) {
+        if (foutStatus(e) !== 412 || poging >= 3) throw e;
+        const actueel = await lees();
+        if (conflictVelden(echt, origineel, actueel).length > 0) throw e;
+        etagWaarde = actueel.etag;
+      }
+    }
+  }
+
   private async verwijder(sleutel: LijstSleutel, id: number): Promise<void> {
     // Naar de prullenbak van de site, zodat een beheerder kan herstellen.
     await this.lijst(sleutel).items.getById(id).recycle();
@@ -214,8 +245,10 @@ export class Repository {
     return this.maak('aanvragen', aanvraagVelden(a));
   }
 
-  async wijzigAanvraag(id: number, a: Partial<Aanvraag>, etagWaarde?: string): Promise<void> {
-    await this.wijzig('aanvragen', id, aanvraagVelden(a), etagWaarde);
+  /** Wijzigt een aanvraag. Met `origineel` (de versie op het scherm) gebeurt dat met ETag-controle (NFR-05). */
+  async wijzigAanvraag(id: number, a: Partial<Aanvraag>, origineel?: Aanvraag): Promise<void> {
+    if (!origineel) return this.wijzig('aanvragen', id, aanvraagVelden(a));
+    await this.wijzigMetControle('aanvragen', id, a, origineel, () => this.aanvraag(id), aanvraagVelden);
   }
 
   async verwijderAanvraag(id: number): Promise<void> {
@@ -295,8 +328,10 @@ export class Repository {
     return this.maak('demos', demoVelden(d));
   }
 
-  async wijzigDemo(id: number, d: Partial<Demo>, etagWaarde?: string): Promise<void> {
-    await this.wijzig('demos', id, demoVelden(d), etagWaarde);
+  /** Wijzigt een demo. Met `origineel` (de versie op het scherm) gebeurt dat met ETag-controle (NFR-05). */
+  async wijzigDemo(id: number, d: Partial<Demo>, origineel?: Demo): Promise<void> {
+    if (!origineel) return this.wijzig('demos', id, demoVelden(d));
+    await this.wijzigMetControle('demos', id, d, origineel, () => this.demo(id), demoVelden);
   }
 
   async verwijderDemo(id: number): Promise<void> {
