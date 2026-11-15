@@ -6,6 +6,7 @@ import { bewaarGrens, FoutBegrenzer, foutDetails } from './foutlog';
 import { formatteerIban, isGeldigeIban, isGeldigEmail } from './validatie';
 import { demoRijen, hulpGezocht, komendeDemos, urenPerBegeleider, demosPerType, matrix, RapportBron, borrelLabel, begeleiderNamen } from './rapportage';
 import { demoOverzichtPerAanvraag, LijstDemo, samenvoeging, sorteerAanvragen } from './aanvragen';
+import { aantalPlekken, demosVoorIndeling, kleurIndex, opNaam, overlapVoor, perDag, toegewezenIds } from './indeling';
 import { Aanvraag, Begeleider, Demo } from '../model';
 
 describe('validatie', () => {
@@ -397,5 +398,86 @@ describe('foutlog', () => {
     for (let i = 0; i < 18; i++) expect(b.mag('x' + i, 12000)).toBe(true);
     expect(b.mag('y', 12000)).toBe(false);
     expect(b.mag('y', 61000)).toBe(true);
+  });
+});
+
+describe('begeleiders indelen (FR-63 t/m FR-65)', () => {
+  const aanvraag = (id: number, status: Aanvraag['status']): Aanvraag => ({
+    id, titel: 'A' + id, naam: '', organisatie: '', email: '', telefoon: '', iban: '', status, onbeantwoord: false, bron: 'E-mail'
+  });
+  const demo = (id: number, aanvraagId: number, start: Date, eventIdDemo: string = 'ev' + id, duurMinuten: number = 60): Demo => ({
+    id, aanvraagId, titel: 'D' + id, start, duurMinuten, aantalDeelnemers: 10, begeleidersNodig: 2, borrel: 'geen',
+    wedstrijd: 'nee', prijsafspraak: '', notitie: '', planningsstatus: 'Voorlopig', eventIdDemo, eventIdOpbouwen: '', eventIdOpruimen: ''
+  });
+
+  it('kiest demo’s in de agenda bij In afwachting en Bevestigd, vanaf een datum, op tijd gesorteerd', () => {
+    const aanvragen = [aanvraag(1, 'In afwachting'), aanvraag(2, 'Bevestigd'), aanvraag(3, 'Nieuw'), aanvraag(4, 'Gesloten')];
+    const demos = [
+      demo(10, 2, new Date(2026, 10, 20, 14)),
+      demo(11, 1, new Date(2026, 10, 18, 10)),
+      demo(12, 1, new Date(2026, 10, 19, 10), ''),
+      demo(13, 3, new Date(2026, 10, 19, 10)),
+      demo(14, 4, new Date(2026, 10, 19, 10)),
+      demo(15, 2, new Date(2026, 10, 10, 10))
+    ];
+    expect(demosVoorIndeling(demos, aanvragen, new Date(2026, 10, 15)).map(d => d.id)).toEqual([11, 10]);
+    expect(demosVoorIndeling(demos, aanvragen).map(d => d.id)).toEqual([15, 11, 10]);
+  });
+
+  it('toont een demo van vandaag die nog bezig is', () => {
+    const d = demo(1, 1, new Date(2026, 10, 15, 9), 'e', 120);
+    expect(demosVoorIndeling([d], [aanvraag(1, 'Bevestigd')], new Date(2026, 10, 15, 10))).toHaveLength(1);
+  });
+
+  it('sorteert op naam, ongeacht hoofdletters en volgorde van invoer', () => {
+    expect(opNaam([{ naam: 'piet' }, { naam: 'Anna' }, { naam: 'Émile' }, { naam: 'bert' }]).map(b => b.naam)).toEqual(['Anna', 'bert', 'Émile', 'piet']);
+  });
+
+  it('geeft elke begeleider een vaste kleur op volgorde van aanmaken', () => {
+    expect(kleurIndex([{ id: 9 }, { id: 3 }, { id: 5 }], 20)).toEqual({ 3: 0, 5: 1, 9: 2 });
+    expect(kleurIndex([{ id: 1 }, { id: 2 }, { id: 3 }], 2)).toEqual({ 1: 0, 2: 1, 3: 0 });
+  });
+
+  it('past wijzigingen die nog worden opgeslagen toe op de toewijzing', () => {
+    const inzet = [{ id: 1, demoId: 10, begeleiderId: 100 }, { id: 2, demoId: 11, begeleiderId: 101 }];
+    expect(toegewezenIds(10, inzet, [])).toEqual([100]);
+    expect(
+      toegewezenIds(10, inzet, [
+        { soort: 'toevoegen', demoId: 10, begeleiderId: 102 },
+        { soort: 'verwijderen', demoId: 10, begeleiderId: 100 },
+        { soort: 'toevoegen', demoId: 11, begeleiderId: 103 }
+      ])
+    ).toEqual([102]);
+    expect(
+      toegewezenIds(10, inzet, [
+        { soort: 'toevoegen', demoId: 10, begeleiderId: 102 },
+        { soort: 'verwijderen', demoId: 10, begeleiderId: 102 }
+      ])
+    ).toEqual([100]);
+  });
+
+  it('toont minstens zoveel plekken als er begeleiders staan', () => {
+    expect(aantalPlekken(2, 0)).toBe(2);
+    expect(aantalPlekken(2, 3)).toBe(3);
+    expect(aantalPlekken(0, 0)).toBe(0);
+  });
+
+  it('vindt overlappende demo’s van dezelfde begeleider, maar niet aansluitende', () => {
+    const a = demo(1, 1, new Date(2026, 10, 20, 14));
+    const b = demo(2, 1, new Date(2026, 10, 20, 14, 30));
+    const c = demo(3, 1, new Date(2026, 10, 20, 15));
+    const toegewezen = (id: number): number[] => (id === 2 || id === 3 ? [100] : []);
+    expect(overlapVoor(a, 100, [a, b, c], toegewezen).map(d => d.id)).toEqual([2]);
+    expect(overlapVoor(a, 101, [a, b, c], toegewezen)).toEqual([]);
+  });
+
+  it('groepeert per dag', () => {
+    const groepen = perDag([
+      { start: new Date(2026, 10, 20, 9) },
+      { start: new Date(2026, 10, 20, 15) },
+      { start: new Date(2026, 10, 21, 9) }
+    ]);
+    expect(groepen.map(g => g.items.length)).toEqual([2, 1]);
+    expect(groepen[1].dag).toEqual(new Date(2026, 10, 21));
   });
 });

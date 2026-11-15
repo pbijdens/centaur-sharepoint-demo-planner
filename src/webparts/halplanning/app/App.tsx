@@ -26,6 +26,7 @@ import {
   DocumentTableArrowRightRegular,
   NavigationRegular,
   PeopleRegular,
+  PeopleTeamRegular,
   PersonQuestionMarkRegular,
   CalendarLtrRegular,
   ReceiptMoneyRegular,
@@ -43,6 +44,7 @@ import { GraphService } from './services/graph';
 import { AanvraagDetail } from './components/AanvraagDetail';
 import { AanvraagLijst } from './components/AanvraagLijst';
 import { Fout, Laden, TOASTER_ID, useBezig } from './components/algemeen';
+import { BegeleidersIndelen } from './components/BegeleidersIndelen';
 import { BeheerBegeleiders, BeheerDemoTypes, BeheerStandaardantwoorden, HandtekeningScherm } from './components/Beheer';
 import { InstallatieScherm, InstellingenScherm } from './components/Instellingen';
 import { zetFoutContext } from './services/foutlogboek';
@@ -50,7 +52,8 @@ import { ExcelDialoog, LijstDialoog, maakFactuurlijst } from './components/Rappo
 
 type Scherm =
   | { s: 'lijst' }
-  | { s: 'aanvraag'; id: number }
+  | { s: 'aanvraag'; id: number; vanuit?: 'indelen' }
+  | { s: 'indelen' }
   | { s: 'begeleiders' }
   | { s: 'demotypes' }
   | { s: 'standaardantwoorden' }
@@ -175,6 +178,9 @@ function Hoofdscherm(): JSX.Element {
               <MenuItem icon={<AddRegular />} onClick={() => setNieuw(true)}>
                 Nieuwe aanvraag
               </MenuItem>
+              <MenuItem icon={<PeopleTeamRegular />} onClick={() => setScherm({ s: 'indelen' })}>
+                Begeleiders indelen
+              </MenuItem>
               <MenuDivider />
               <MenuItem icon={<TextBulletListSquareRegular />} onClick={() => setScherm({ s: 'standaardantwoorden' })}>
                 Standaardantwoorden
@@ -214,7 +220,14 @@ function Hoofdscherm(): JSX.Element {
       </div>
 
       {scherm.s === 'lijst' && <AanvraagLijst open={id => setScherm({ s: 'aanvraag', id })} nieuw={() => setNieuw(true)} />}
-      {scherm.s === 'aanvraag' && <AanvraagDetail id={scherm.id} terug={naarLijst} open={id => setScherm({ s: 'aanvraag', id })} />}
+      {scherm.s === 'aanvraag' && (
+        <AanvraagDetail
+          id={scherm.id}
+          terug={scherm.vanuit === 'indelen' ? () => setScherm({ s: 'indelen' }) : naarLijst}
+          open={id => setScherm({ s: 'aanvraag', id })}
+        />
+      )}
+      {scherm.s === 'indelen' && <BegeleidersIndelen terug={naarLijst} openAanvraag={id => setScherm({ s: 'aanvraag', id, vanuit: 'indelen' })} />}
       {scherm.s === 'begeleiders' && <BeheerBegeleiders terug={naarLijst} />}
       {scherm.s === 'demotypes' && <BeheerDemoTypes terug={naarLijst} />}
       {scherm.s === 'standaardantwoorden' && <BeheerStandaardantwoorden terug={naarLijst} />}

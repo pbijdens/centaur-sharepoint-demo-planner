@@ -302,6 +302,16 @@ export class Repository {
     return rijen.map(naarDemo);
   }
 
+  async demosVoorAanvragen(aanvraagIds: number[]): Promise<Demo[]> {
+    const uniek = aanvraagIds.filter((id, i) => aanvraagIds.indexOf(id) === i);
+    const uit: Demo[] = [];
+    for (const blok of inBlokken(uniek, 40)) {
+      const rijen = await this.alle('demos', DEMO_VELDEN, blok.map(id => 'AanvraagId eq ' + id).join(' or '));
+      uit.push(...rijen.map(naarDemo));
+    }
+    return uit;
+  }
+
   async demo(id: number): Promise<Demo> {
     return naarDemo((await this.lijst('demos').items.getById(id).select(...DEMO_VELDEN)()) as Ruw);
   }
