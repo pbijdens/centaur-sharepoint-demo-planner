@@ -183,6 +183,9 @@ De SharePoint-lijsten worden benaderd met de eigen SharePoint-rechten van de geb
 | FR-60 | Per demo kunnen begeleiders uit de beheerlijst worden toegewezen, eventueel met een eigen duur in minuten (standaard: de duur van de demo). |
 | FR-61 | Per demo is zichtbaar hoeveel begeleiders zijn toegewezen ten opzichte van het aantal dat nodig is (bijvoorbeeld "1 / 2"). Elke toegewezen begeleider telt volledig mee, ook als die een kortere duur heeft. |
 | FR-62 | Een begeleider kan niet twee keer aan dezelfde demo worden toegewezen. |
+| FR-63 | **Begeleiders indelen** (hoofdmenu): één scherm met alle demo's die in de agenda staan en horen bij een aanvraag met status *In afwachting* of *Bevestigd*, vanaf vandaag (eerdere demo's op verzoek), gegroepeerd per dag. Per demo staan de plekken voor begeleiders: zoveel als *begeleiders nodig* (standaard 2), met de toegewezen begeleiders en lege plekken. Een filter toont alleen demo's met open plekken. Vanuit een demo is de aanvraag te openen. |
+| FR-64 | Indelen gaat met één tik: een lege plek (of de demo) opent een keuzelijst met alle actieve begeleiders; tikken zet een begeleider erbij of haalt hem eraf, direct opgeslagen en met bijgewerkte agenda (UC-10). In dezelfde keuzelijst is het aantal plekken met − en + te wijzigen. Een begeleider die al bij een andere demo op hetzelfde moment staat, krijgt een waarschuwing (toewijzen blijft mogelijk). |
+| FR-65 | Elke begeleider heeft een eigen, vaste kleur (op volgorde van aanmaken, ook in het donkere thema leesbaar). Begeleiders staan altijd op alfabetische volgorde, ongeacht de volgorde van toewijzen. |
 
 ### 4.8 Hoofdmenu (hamburgermenu)
 
@@ -193,6 +196,7 @@ De SharePoint-lijsten worden benaderd met de eigen SharePoint-rechten van de geb
 | FR-72 | Begeleiders | Beheren: naam, telefoon, e-mail, actief/inactief. Inactieve begeleiders zijn niet meer toe te wijzen, maar blijven zichtbaar in de historie. |
 | FR-73 | Soorten demo | Beheren: naam, volgorde, actief/inactief. |
 | FR-74 | Handtekening | Eén gedeelde handtekening (rich text) bewerken. |
+| FR-63 | Begeleiders indelen | Snel begeleiders indelen bij komende demo's (zie §4.7). |
 | FR-80 | Instellingen | Het adres van de gedeelde mailbox instellen en daarna de agenda kiezen uit de agenda's van die mailbox. Daarbij controleert de app of de ingelogde gebruiker toegang heeft tot de mailbox en de agenda. Zolang dit niet is ingesteld, toont de app bij het openen het instellingenscherm. |
 | FR-81 | Installatie op een site | Ontbreken de lijsten op de huidige site (of kolommen, of keuzes in een keuzekolom, zoals een nieuwe status), dan biedt de app aan om ze aan te maken, met kolommen, indexen en beginwaarden (zoals de soorten demo). Dit vereist rechten als site-eigenaar; andere gebruikers krijgen een melding dat een eigenaar de app eerst moet installeren. |
 | FR-75 | Excel-export | Vraagt om een periode (van/tot) en maakt een .xlsx met deze tabbladen: **Demo's** (alle demo's in de periode met alle velden), **Begeleiders**, **Demo × begeleider** (matrix), **Uren per begeleider** (aantal demo's en totale uren), **Demo's per type** (aantal demo's en deelnemers). |
@@ -420,13 +424,19 @@ Standaardantwoorden, begeleiders, soorten demo en de handtekening worden via het
 1. De agent kiest bij een demo *Dupliceren…* en vult één of meer datums met begintijd in.
 2. Het systeem maakt per datum een kopie van de demo met dezelfde begeleiders binnen dezelfde aanvraag en zet de afspraken in de agenda (FR-59).
 
+### UC-22 Begeleiders indelen
+1. De agent kiest in het hoofdmenu *Begeleiders indelen* en ziet de komende demo's per dag, met de plekken per demo.
+2. De agent tikt op een lege plek en tikt in de keuzelijst één of meer begeleiders aan (of uit); elke keuze wordt direct opgeslagen en de agenda wordt bijgewerkt (FR-63, FR-64).
+**Alternatief:** de agent past in de keuzelijst het aantal plekken aan met − en +, of haalt een begeleider weg met het kruisje op de plek.
+
 ## 8. Schermen (globaal)
 
 1. **Startscherm**: bovenbalk met hamburgermenu en zoekveld, een rij statusfilters (chips) en de lijst met aanvragen (kaarten op mobiel, tabel op desktop).
 2. **Aanvraag**: kop met titel, status (wijzigbaar) en acties. Tabbladen of secties: *Conversatie* (met antwoordeditor), *Gegevens*, *Demo's* (met begeleiders), *Agenda*, *Notities*, *Geschiedenis*.
 3. **Agenda-dagweergave**: tijdlijn van één dag met een balk voor hele-dagafspraken bovenaan en de navigatie.
-4. **Beheerschermen**: één per stamlijst.
-5. **Export/lijst-dialogen**: periode of aantal weken kiezen, voorbeeld bekijken en actieknoppen.
+4. **Begeleiders indelen**: komende demo's per dag als kaarten met gekleurde plekken voor begeleiders en een keuzelijst om in te delen.
+5. **Beheerschermen**: één per stamlijst.
+6. **Export/lijst-dialogen**: periode of aantal weken kiezen, voorbeeld bekijken en actieknoppen.
 
 ## 9. Risico's en aandachtspunten
 
