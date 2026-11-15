@@ -4,6 +4,7 @@ import { afsprakenVoorDemo, AfspraakSoort, AFSPRAAKSOORTEN, opnieuwAanmaken, Ver
 import { samenvoeging } from '../logic/aanvragen';
 import { datumTijdKort } from '../logic/datum';
 import { antwoordHtml, antwoordOnderwerp, citaatHtml, parseAdressen } from '../logic/mail';
+import { aanvraagNaToevoegen, MailboxBericht, naarAppBericht, ontbrekendeBerichten } from '../logic/ophalen';
 import {
   Aanvraag,
   Bericht,
@@ -240,6 +241,45 @@ export class Acties {
     const outlookLink = g.webLink || '';
     await this.repo.wijzigBericht(bericht.id, { vanNaam, outlookLink, graphMessageId: g.id });
     return { vanNaam, outlookLink, graphMessageId: g.id };
+  }
+
+  /**
+   * Zoekt in de gedeelde mailbox naar berichten rond deze aanvraag die nog niet in de app staan (FR-46): in de
+   * conversaties van de bestaande berichten en op het e-mailadres van de aanvraag.
+   */
+  async zoekOntbrekendeBerichten(aanvraag: Aanvraag, berichten: Bericht[]): Promise<MailboxBericht[]> {
+    const gevonden = await this.graph.zoekBerichtenRondom(
+      aanvraag.email,
+      berichten.map(b => b.conversationId)
+    );
+    const bekend = await this.repo.bekendeMessageIds(gevonden.map(g => g.internetMessageId));
+    berichten.forEach(b => bekend.add(b.internetMessageId));
+    return ontbrekendeBerichten(gevonden, bekend);
+  }
+
+  /** Voegt berichten uit de mailbox toe aan de aanvraag en werkt LaatsteBerichtOp en Onbeantwoord bij (FR-46). */
+  async voegBerichtenToe(aanvraag: Aanvraag, bestaand: Bericht[], gekozen: MailboxBericht[]): Promise<number> {
+    const nieuw = gekozen.map(g => naarAppBericht(g, aanvraag.id, this.graph.mailboxAdres));
+    // Nog eens controleren vlak voor het opslaan: een andere agent of de flow kan het bericht net hebben toegevoegd.
+    const bekend = await this.repo.bekendeMessageIds(nieuw.map(b => b.internetMessageId));
+    const toegevoegd: Omit<Bericht, 'id'>[] = [];
+    for (const b of nieuw) {
+      if (bekend.has(b.internetMessageId)) continue;
+      await this.repo.maakBericht(b);
+      toegevoegd.push(b);
+    }
+    const na = aanvraagNaToevoegen(aanvraag.laatsteBerichtOp, bestaand, toegevoegd);
+    const wijziging: Partial<Aanvraag> = {};
+    if (na.laatsteBerichtOp) wijziging.laatsteBerichtOp = na.laatsteBerichtOp;
+    if (na.onbeantwoord) wijziging.onbeantwoord = true;
+    // Een aanvraag die de flow met alleen het adres aanmaakte, krijgt de naam van de afzender (FR-06).
+    const metNaam = toegevoegd.filter(b => b.richting === 'Inkomend' && b.vanAdres === aanvraag.email && b.vanNaam !== b.vanAdres)[0];
+    if (metNaam && aanvraag.naam === aanvraag.email) {
+      wijziging.naam = metNaam.vanNaam;
+      if (aanvraag.titel === aanvraag.email) wijziging.titel = metNaam.vanNaam;
+    }
+    if (Object.keys(wijziging).length > 0) await this.repo.wijzigAanvraag(aanvraag.id, wijziging);
+    return toegevoegd.length;
   }
 
   /** Verplaatst een bericht naar een andere of nieuwe aanvraag (UC-13). Geeft het id van de doelaanvraag. */

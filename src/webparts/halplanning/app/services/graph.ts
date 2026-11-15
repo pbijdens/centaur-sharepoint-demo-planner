@@ -4,6 +4,7 @@ import { MSGraphClientV3 } from '@microsoft/sp-http';
 import { AgendaItem, EventPayload } from '../logic/agenda';
 import { vanGraphDatumTijd } from '../logic/datum';
 import { voegInNaBody } from '../logic/mail';
+import { MailboxBericht } from '../logic/ophalen';
 import { CATEGORIE_BEVESTIGD, CATEGORIE_DEMO, CATEGORIE_VOORLOPIG, GRAPH_TIJDZONE } from '../model';
 import { foutStatus } from './sp';
 
@@ -19,6 +20,13 @@ export interface GraphBericht {
   hasAttachments?: boolean;
   from?: GraphAdres;
   body?: { contentType: string; content: string };
+  subject?: string;
+  toRecipients?: GraphAdres[];
+  ccRecipients?: GraphAdres[];
+  receivedDateTime?: string;
+  bodyPreview?: string;
+  isDraft?: boolean;
+  parentFolderId?: string;
 }
 
 export interface GraphEvent {
@@ -90,6 +98,67 @@ export class GraphService {
       .top(1)
       .get();
     return (r.value as GraphBericht[])[0];
+  }
+
+  /**
+   * Zoekt berichten rond een aanvraag (FR-46): alle berichten in de opgegeven conversaties en alle berichten met het
+   * adres als afzender of ontvanger. Concepten, verwijderde items en ongewenste e-mail tellen niet mee.
+   */
+  async zoekBerichtenRondom(adres: string, conversationIds: string[]): Promise<MailboxBericht[]> {
+    const velden = 'id,subject,from,toRecipients,ccRecipients,receivedDateTime,body,bodyPreview,conversationId,internetMessageId,hasAttachments,webLink,isDraft,parentFolderId';
+    const uitgesloten = await this.mapIds(['drafts', 'deleteditems', 'junkemail']);
+    const gevonden: GraphBericht[] = [];
+    const haal = async (pad: string, maxPaginas: number): Promise<void> => {
+      let r = await this.client.api(pad).get();
+      for (let pagina = 1; ; pagina++) {
+        gevonden.push(...(r.value as GraphBericht[]));
+        const volgende = r['@odata.nextLink'] as string | undefined;
+        if (!volgende || pagina >= maxPaginas) break;
+        r = await this.client.api(volgende).get();
+      }
+    };
+    // Zelf coderen, net als bij zoekBericht: de Graph-client codeert $filter en $search niet.
+    for (const c of conversationIds.filter((c, i) => !!c && conversationIds.indexOf(c) === i).slice(0, 10)) {
+      const filter = "conversationId eq '" + c.replace(/'/g, "''") + "'";
+      await haal(this.mb + '/messages?$filter=' + encodeURIComponent(filter) + '&$select=' + velden + '&$top=50', 2);
+    }
+    if (adres) {
+      const zoek = '"participants:' + adres.replace(/"/g, '') + '"';
+      await haal(this.mb + '/messages?$search=' + encodeURIComponent(zoek) + '&$select=' + velden + '&$top=50', 4);
+    }
+    const adressen = (l?: GraphAdres[]): string[] => (l || []).map(a => a.emailAddress.address).filter(a => !!a);
+    return gevonden
+      .filter(g => !g.isDraft && uitgesloten.indexOf(g.parentFolderId || '') < 0)
+      .map(g => ({
+        graphId: g.id,
+        onderwerp: g.subject || '',
+        vanNaam: (g.from && g.from.emailAddress.name) || '',
+        vanAdres: (g.from && g.from.emailAddress.address) || '',
+        aan: adressen(g.toRecipients),
+        cc: adressen(g.ccRecipients),
+        ontvangenOp: g.receivedDateTime ? new Date(g.receivedDateTime) : undefined,
+        body: (g.body && g.body.content) || '',
+        voorbeeld: g.bodyPreview || '',
+        conversationId: g.conversationId || '',
+        internetMessageId: g.internetMessageId || '',
+        webLink: g.webLink || '',
+        heeftBijlagen: !!g.hasAttachments
+      }));
+  }
+
+  /** Id's van bekende mappen (bijvoorbeeld "drafts"); een map die niet gelezen kan worden, wordt overgeslagen. */
+  private async mapIds(namen: string[]): Promise<string[]> {
+    const ids = await Promise.all(
+      namen.map(n =>
+        this.client
+          .api(this.mb + '/mailFolders/' + n)
+          .select('id')
+          .get()
+          .then((m: { id: string }) => m.id)
+          .catch(() => '')
+      )
+    );
+    return ids.filter(i => !!i);
   }
 
   /**

@@ -6,6 +6,7 @@ import { IList } from '@pnp/sp/lists';
 import { LIJSTEN, LijstSleutel } from '../lists';
 import { LijstDemo } from '../logic/aanvragen';
 import { alleenGewijzigd, conflictVelden } from '../logic/conflict';
+import { GEEN_ONDERWERP } from '../logic/ophalen';
 import { foutStatus } from './sp';
 import {
   Aanvraag,
@@ -264,7 +265,8 @@ export class Repository {
 
   async maakBericht(b: Omit<Bericht, 'id'>): Promise<number> {
     return this.maak('berichten', {
-      Title: (b.onderwerp || '').slice(0, 255),
+      // Title is verplicht; een mail zonder onderwerp zou anders niet opgeslagen kunnen worden (FR-04).
+      Title: ((b.onderwerp || '').trim() ? b.onderwerp : GEEN_ONDERWERP).slice(0, 255),
       AanvraagId: b.aanvraagId,
       Richting: b.richting,
       VanNaam: b.vanNaam,
@@ -280,6 +282,22 @@ export class Repository {
       HeeftBijlagen: b.heeftBijlagen,
       VerstuurdDoor: b.verstuurdDoor || ''
     });
+  }
+
+  /** Welke van de opgegeven InternetMessageId's al bij een bericht in de app staan (bij welke aanvraag dan ook). */
+  async bekendeMessageIds(ids: string[]): Promise<Set<string>> {
+    const bekend = new Set<string>();
+    const uniek = ids.filter((id, i) => !!id && ids.indexOf(id) === i);
+    // In porties, zodat de URL niet te lang wordt.
+    for (let i = 0; i < uniek.length; i += 15) {
+      const filter = uniek
+        .slice(i, i + 15)
+        .map(id => 'InternetMessageId eq ' + odata(id))
+        .join(' or ');
+      const rijen = await this.alle('berichten', ['Id', 'InternetMessageId'], filter);
+      for (const r of rijen) bekend.add(str(r, 'InternetMessageId'));
+    }
+    return bekend;
   }
 
   async wijzigBericht(id: number, v: { aanvraagId?: number; vanNaam?: string; outlookLink?: string; graphMessageId?: string }): Promise<void> {

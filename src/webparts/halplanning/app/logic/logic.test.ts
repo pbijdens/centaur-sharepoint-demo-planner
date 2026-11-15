@@ -7,6 +7,7 @@ import { formatteerIban, isGeldigeIban, isGeldigEmail } from './validatie';
 import { demoRijen, hulpGezocht, komendeDemos, urenPerBegeleider, demosPerType, matrix, RapportBron, borrelLabel, begeleiderNamen } from './rapportage';
 import { demoOverzichtPerAanvraag, LijstDemo, samenvoeging, sorteerAanvragen } from './aanvragen';
 import { aantalPlekken, demosVoorIndeling, kleurIndex, opNaam, overlapVoor, perDag, toegewezenIds } from './indeling';
+import { aanvraagNaToevoegen, GEEN_ONDERWERP, MailboxBericht, naarAppBericht, ontbrekendeBerichten, standaardGekozen } from './ophalen';
 import { Aanvraag, Begeleider, Demo } from '../model';
 
 describe('validatie', () => {
@@ -479,5 +480,62 @@ describe('begeleiders indelen (FR-63 t/m FR-65)', () => {
     ]);
     expect(groepen.map(g => g.items.length)).toEqual([2, 1]);
     expect(groepen[1].dag).toEqual(new Date(2026, 10, 21));
+  });
+});
+
+describe('berichten ophalen uit de mailbox (FR-46)', () => {
+  const mb = (id: string, op: string, extra: Partial<MailboxBericht> = {}): MailboxBericht => ({
+    graphId: 'g-' + id,
+    onderwerp: 'Vraag',
+    vanNaam: 'Asia',
+    vanAdres: 'klant@example.com',
+    aan: ['democommissie@ahv-centaur.nl'],
+    cc: [],
+    ontvangenOp: new Date(op),
+    body: '<p>Hallo</p>',
+    voorbeeld: 'Hallo',
+    conversationId: 'conv-1',
+    internetMessageId: id,
+    webLink: 'https://outlook/' + id,
+    heeftBijlagen: false,
+    ...extra
+  });
+
+  it('slaat bekende, dubbele en id-loze berichten over en sorteert op datum', () => {
+    const r = ontbrekendeBerichten(
+      [mb('<b>', '2026-11-08T10:00:00Z'), mb('<a>', '2026-11-07T10:00:00Z'), mb('<b>', '2026-11-08T10:00:00Z'), mb('<c>', '2026-11-09T10:00:00Z'), mb('', '2026-11-01T10:00:00Z')],
+      new Set(['<c>'])
+    );
+    expect(r.map(b => b.internetMessageId)).toEqual(['<a>', '<b>']);
+  });
+
+  it('vinkt berichten uit dezelfde conversatie of rond de aanvraag standaard aan', () => {
+    const gemaakt = new Date('2026-11-07T21:03:00Z');
+    expect(standaardGekozen(mb('<a>', '2025-01-01T00:00:00Z'), ['conv-1'], gemaakt)).toBe(true);
+    expect(standaardGekozen(mb('<a>', '2025-01-01T00:00:00Z', { conversationId: 'oud' }), ['conv-1'], gemaakt)).toBe(false);
+    expect(standaardGekozen(mb('<a>', '2026-10-30T00:00:00Z', { conversationId: 'oud' }), [], gemaakt)).toBe(true);
+    expect(standaardGekozen(mb('<a>', '2025-01-01T00:00:00Z'), [], undefined)).toBe(true);
+  });
+
+  it('zet een bericht zonder onderwerp en een verzonden bericht goed om', () => {
+    const inkomend = naarAppBericht(mb('<a>', '2026-11-07T21:02:49Z', { onderwerp: '' }), 263, 'democommissie@ahv-centaur.nl');
+    expect(inkomend.onderwerp).toBe(GEEN_ONDERWERP);
+    expect(inkomend.richting).toBe('Inkomend');
+    expect(inkomend.aanvraagId).toBe(263);
+    expect(inkomend.outlookLink).toBe('https://outlook/<a>');
+    const uit = naarAppBericht(mb('<b>', '2026-11-08T10:00:00Z', { vanAdres: 'Democommissie@AHV-centaur.nl', aan: ['a@x.nl', 'b@x.nl'] }), 263, 'democommissie@ahv-centaur.nl');
+    expect(uit.richting).toBe('Uitgaand');
+    expect(uit.aan).toBe('a@x.nl; b@x.nl');
+    expect(naarAppBericht(mb('<c>', '2026-11-08T10:00:00Z', { body: 'x'.repeat(70000) }), 1, '').body.length).toBe(60000);
+  });
+
+  it('werkt LaatsteBerichtOp en Onbeantwoord alleen bij voor een nieuwer inkomend bericht', () => {
+    const d = (s: string): Date => new Date(s);
+    const inkomend = { richting: 'Inkomend' as const, ontvangenOp: d('2026-11-10T10:00:00Z') };
+    const uitgaand = { richting: 'Uitgaand' as const, ontvangenOp: d('2026-11-11T10:00:00Z') };
+    expect(aanvraagNaToevoegen(d('2026-11-01T00:00:00Z'), [], [inkomend])).toEqual({ laatsteBerichtOp: inkomend.ontvangenOp, onbeantwoord: true });
+    expect(aanvraagNaToevoegen(d('2026-11-01T00:00:00Z'), [], [inkomend, uitgaand]).onbeantwoord).toBe(false);
+    expect(aanvraagNaToevoegen(d('2026-11-12T00:00:00Z'), [{ ontvangenOp: d('2026-11-12T00:00:00Z') }], [inkomend])).toEqual({ laatsteBerichtOp: undefined, onbeantwoord: false });
+    expect(aanvraagNaToevoegen(undefined, [], [uitgaand])).toEqual({ onbeantwoord: false });
   });
 });

@@ -115,7 +115,7 @@ Hieronder staat **`T`** voor de uitvoer van de trigger (`triggerOutputs()?['body
 
 | Kolom | Waarde (expressie) |
 |---|---|
-| Onderwerp | `substring(coalesce(triggerOutputs()?['body/subject'], '(geen onderwerp)'), 0, min(255, length(coalesce(triggerOutputs()?['body/subject'], '(geen onderwerp)'))))` |
+| Onderwerp | zie hieronder |
 | Aanvraag (Id) | `variables('AanvraagId')` |
 | Richting | `Inkomend` |
 | Van (naam) | `T/from` |
@@ -128,6 +128,15 @@ Hieronder staat **`T`** voor de uitvoer van de trigger (`triggerOutputs()?['body
 | Internet-bericht-id | `T/internetMessageId` |
 | Graph-bericht-id | `T/id` |
 | Heeft bijlagen | `T/hasAttachments` |
+
+Expressie voor **Onderwerp**. De kolom is verplicht. Een mail zonder onderwerp heeft in de trigger een *lege tekst* (geen `null`), dus `coalesce` alleen is niet genoeg: dan faalt deze stap, terwijl de aanvraag al is aangemaakt (de aanvraag staat er dan zonder bericht).
+
+```
+if(empty(trim(coalesce(triggerOutputs()?['body/subject'], ''))),
+   '(geen onderwerp)',
+   substring(coalesce(triggerOutputs()?['body/subject'], ''), 0,
+             min(255, length(coalesce(triggerOutputs()?['body/subject'], '')))))
+```
 
 Expressie voor **Inhoud**. Een kolom met meerdere regels tekst houdt maximaal ongeveer 63.000 tekens, dus heel lange mails (nieuwsbrieven) worden afgekapt:
 
@@ -168,4 +177,5 @@ Gebruik **SharePoint – Een HTTP-aanvraag naar SharePoint verzenden**. De actie
 
 - Power Automate mailt de eigenaar van de flow standaard bij mislukte runs.
 - Runs kunnen veilig opnieuw worden gestart; stap 3 voorkomt dubbele berichten.
+- Is een run toch halverwege mislukt (bijvoorbeeld een aanvraag zonder bericht), dan kan een agent het bericht bij de aanvraag binnenhalen met **Berichten ophalen** onder de conversatie (FR-46).
 - De kolom *Internet-bericht-id* is uniek. Als twee runs tegelijk hetzelfde bericht verwerken, faalt de tweede bij stap 7, zonder dubbele gegevens.
