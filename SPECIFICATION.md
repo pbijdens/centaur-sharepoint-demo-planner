@@ -83,7 +83,7 @@ De SharePoint-lijsten worden benaderd met de eigen SharePoint-rechten van de geb
 | FR-01 | Elke nieuwe e-mail in het Postvak IN van *halplanning* wordt precies één keer verwerkt. Dubbele verwerking wordt voorkomen op basis van `InternetMessageId`. |
 | FR-02 | Koppelregels, in deze volgorde: **(1)** er is een *open* aanvraag met hetzelfde `ConversationId` → bericht toevoegen aan die aanvraag. **(2)** Er is een *open* aanvraag met hetzelfde afzenderadres → bericht toevoegen aan die aanvraag (bij meerdere: de aanvraag met het meest recente bericht). **(3)** Anders → nieuwe aanvraag met status *Nieuw*. |
 | FR-03 | "Open" betekent: status *Nieuw*, *In afwachting*, *Bevestigd*, *Klaar voor facturatie* of *Gefactureerd*. Bij *Gesloten* en *Verwijderd* wordt nooit automatisch gekoppeld; er ontstaat dan een nieuwe aanvraag. |
-| FR-04 | Per bericht worden opgeslagen: afzender (naam + adres), ontvangers, onderwerp, ontvangstmoment, HTML-body, `ConversationId`, `InternetMessageId`, Graph-bericht-id, of er bijlagen zijn, en een link om het bericht in Outlook (web) te openen. Bijlagen zelf worden niet opgeslagen. |
+| FR-04 | Per bericht worden opgeslagen: afzender (naam + adres), ontvangers, onderwerp, ontvangstmoment, HTML-body, `ConversationId`, `InternetMessageId`, Graph-bericht-id, of er bijlagen zijn, en een link om het bericht in Outlook (web) te openen. Bijlagen zelf worden niet opgeslagen. Een mail zonder onderwerp krijgt als onderwerp "(geen onderwerp)" (de kolom is verplicht). |
 | FR-05 | Na koppelen wordt op de aanvraag `LaatsteBerichtOp` bijgewerkt en `Onbeantwoord` op *ja* gezet. |
 | FR-06 | Bij een nieuwe aanvraag worden Titel, Naam en E-mailadres gevuld met het adres van de afzender. Zodra een agent de aanvraag opent, vervangt de app het adres in Naam en Titel door de naam van de afzender (B10). |
 | FR-07 | Het mailboxadres en de site-URL zijn in de flow **omgevingsvariabelen** van de Power Platform-oplossing. Bij inzet voor een ander team worden die variabelen ingevuld; er is geen aanpassing van de flow zelf nodig. |
@@ -135,6 +135,7 @@ De SharePoint-lijsten worden benaderd met de eigen SharePoint-rechten van de geb
 | FR-43 | **Definitief verwijderen** verwijdert de aanvraag met alle berichten, demo's, inzet en notities, plus de bijbehorende agenda-items. Dit vereist een bevestiging. De lijstitems gaan naar de prullenbak van de site, zodat een sitebeheerder ze in noodgevallen kan herstellen; de e-mails in de mailbox blijven bestaan. |
 | FR-44 | **Samenvoegen**: een aanvraag kan worden samengevoegd met een andere aanvraag (het doel, elke status behalve *Verwijderd*). Alle berichten, demo's (met inzet en agenda-afspraken), notities en statuswijzigingen gaan naar het doel. Lege klantgegevens van het doel worden aangevuld met die van de samengevoegde aanvraag; afwijkende gegevens worden niet overschreven maar in een notitie bij het doel vastgelegd, samen met de titel van de samengevoegde aanvraag. `Onbeantwoord` wordt *ja* als een van beide onbeantwoord was en `LaatsteBerichtOp` wordt de laatste van beide. De status van het doel blijft gelijk. Daarna gaat de samengevoegde aanvraag naar de prullenbak van de site. Dit vereist een bevestiging. |
 | FR-45 | **Demo verplaatsen**: een demo kan naar een andere bestaande aanvraag worden verplaatst (elke status behalve *Verwijderd*). Inzet en agenda-afspraken gaan mee; de afspraken zelf veranderen niet. Beide aanvragen krijgen een notitie. |
+| FR-46 | **Berichten ophalen uit de mailbox**: bij een aanvraag kan de agent de gedeelde mailbox doorzoeken op berichten die de app nog niet heeft (bijvoorbeeld omdat de flow faalde). De app zoekt in de conversaties van de bestaande berichten en op het e-mailadres van de aanvraag (afzender of ontvanger), in alle mappen behalve *Concepten*, *Verwijderde items* en *Ongewenste e-mail*. Berichten die al in de app staan (op `InternetMessageId`, ook bij een andere aanvraag) worden overgeslagen. De agent ziet de gevonden berichten en kiest welke worden toegevoegd; standaard aangevinkt zijn berichten uit een bestaande conversatie en berichten vanaf 14 dagen vóór het aanmaken van de aanvraag. Toegevoegde berichten krijgen Richting *Uitgaand* als de gedeelde mailbox de afzender is, anders *Inkomend*. `LaatsteBerichtOp` wordt bijgewerkt en `Onbeantwoord` wordt *ja* als het nieuwste bericht van de aanvraag een toegevoegd inkomend bericht is. |
 
 ### 4.5 Klantgegevens (per aanvraag)
 
@@ -428,6 +429,11 @@ Standaardantwoorden, begeleiders, soorten demo en de handtekening worden via het
 1. De agent kiest in het hoofdmenu *Begeleiders indelen* en ziet de komende demo's per dag, met de plekken per demo.
 2. De agent tikt op een lege plek en tikt in de keuzelijst één of meer begeleiders aan (of uit); elke keuze wordt direct opgeslagen en de agenda wordt bijgewerkt (FR-63, FR-64).
 **Alternatief:** de agent past in de keuzelijst het aantal plekken aan met − en +, of haalt een begeleider weg met het kruisje op de plek.
+
+### UC-23 Berichten ophalen uit de mailbox
+1. De agent ziet dat er een bericht ontbreekt bij een aanvraag en kiest onder de conversatie *Berichten ophalen*.
+2. Het systeem doorzoekt de gedeelde mailbox en toont de berichten die nog niet in de app staan (FR-46).
+3. De agent vinkt de juiste berichten aan en kiest *Toevoegen*; het systeem voegt ze toe aan de aanvraag.
 
 ## 8. Schermen (globaal)
 

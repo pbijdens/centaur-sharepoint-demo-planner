@@ -1,9 +1,10 @@
-// Conversatie van een aanvraag: berichten, verplaatsen en antwoorden (FR-30 t/m FR-36, FR-41).
+// Conversatie van een aanvraag: berichten, verplaatsen, antwoorden en ophalen uit de mailbox (FR-30 t/m FR-36, FR-41, FR-46).
 
 import * as React from 'react';
 import {
   Badge,
   Button,
+  Checkbox,
   Dialog,
   DialogActions,
   DialogBody,
@@ -21,11 +22,13 @@ import {
   MenuPopover,
   MenuTrigger,
   Option,
+  Spinner,
   tokens
 } from '@fluentui/react-components';
 import {
   AttachRegular,
   ArrowReplyAllRegular,
+  ArrowSyncRegular,
   MailRegular,
   MoreVerticalRegular,
   OpenRegular,
@@ -35,6 +38,7 @@ import {
 import { useDiensten } from '../AppContext';
 import { datumTijd } from '../logic/datum';
 import { allenBeantwoorden, antwoordOnderwerp, splitsCitaat } from '../logic/mail';
+import { MailboxBericht, standaardGekozen } from '../logic/ophalen';
 import { Aanvraag, Bericht, OPEN_STATUSSEN, Standaardantwoord } from '../model';
 import { useBezig, useGedeeldeStijl, useMelding } from './algemeen';
 import { TekstEditor, TekstEditorApi } from './TekstEditorUitgesteld';
@@ -62,6 +66,22 @@ const useStijl = makeStyles({
     borderRadius: tokens.borderRadiusMedium,
     color: tokens.colorNeutralForeground3,
     fontSize: tokens.fontSizeBase200
+  },
+  kandidaat: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '4px',
+    padding: '6px 0',
+    borderBottom: '1px solid ' + tokens.colorNeutralStroke2
+  },
+  kandidaatTekst: { minWidth: 0, paddingTop: '6px', overflowWrap: 'anywhere' },
+  voorbeeld: {
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground3,
+    display: '-webkit-box',
+    WebkitLineClamp: '2',
+    WebkitBoxOrient: 'vertical',
+    overflow: 'hidden'
   }
 });
 
@@ -186,6 +206,93 @@ function VerplaatsDialoog(props: { bericht?: Bericht; huidigeId: number; onSluit
   );
 }
 
+function OphaalDialoog(props: { open: boolean; aanvraag: Aanvraag; berichten: Bericht[]; onSluit: (toegevoegd: boolean) => void }): JSX.Element {
+  const d = useDiensten();
+  const s = useStijl();
+  const g = useGedeeldeStijl();
+  const melding = useMelding();
+  const [gevonden, setGevonden] = React.useState<MailboxBericht[] | undefined>();
+  const [gekozen, setGekozen] = React.useState<Record<string, boolean>>({});
+  const [bezig, voerUit] = useBezig();
+
+  React.useEffect(() => {
+    if (!props.open) return;
+    setGevonden(undefined);
+    const conversaties = props.berichten.map(b => b.conversationId).filter(c => !!c);
+    d.acties
+      .zoekOntbrekendeBerichten(props.aanvraag, props.berichten)
+      .then(r => {
+        const keuze: Record<string, boolean> = {};
+        r.forEach(b => (keuze[b.internetMessageId] = standaardGekozen(b, conversaties, props.aanvraag.gemaakt)));
+        setGekozen(keuze);
+        setGevonden(r);
+      })
+      .catch(e => {
+        melding.fout(e);
+        props.onSluit(false);
+      });
+  }, [props.open]);
+
+  const teKiezen = (gevonden || []).filter(b => gekozen[b.internetMessageId]);
+
+  const voegToe = async (): Promise<void> => {
+    const n = await voerUit(() => d.acties.voegBerichtenToe(props.aanvraag, props.berichten, teKiezen));
+    if (n === undefined) return;
+    melding.ok(n === 1 ? '1 bericht toegevoegd' : n + ' berichten toegevoegd');
+    props.onSluit(n > 0);
+  };
+
+  const wie = (b: MailboxBericht): string =>
+    b.vanAdres.toLowerCase() === d.instellingen.mailboxAdres.toLowerCase() ? 'Aan: ' + b.aan.join('; ') : b.vanNaam || b.vanAdres;
+
+  return (
+    <Dialog open={props.open} onOpenChange={(_, v) => !v.open && !bezig && props.onSluit(false)}>
+      <DialogSurface>
+        <DialogBody>
+          <DialogTitle>Berichten ophalen uit de mailbox</DialogTitle>
+          <DialogContent>
+            {!gevonden && <Spinner size="small" label="Mailbox doorzoeken…" />}
+            {gevonden && gevonden.length === 0 && (
+              <div className={g.leeg}>Er staan geen berichten in de mailbox die nog niet in de app staan.</div>
+            )}
+            {gevonden && gevonden.length > 0 && (
+              <div>
+                <div>Deze berichten staan wel in de mailbox, maar nog niet in de app. Vink aan welke bij deze aanvraag horen.</div>
+                {gevonden.map(b => (
+                  <div key={b.internetMessageId} className={s.kandidaat}>
+                    <Checkbox
+                      checked={!!gekozen[b.internetMessageId]}
+                      onChange={(_, v) => setGekozen({ ...gekozen, [b.internetMessageId]: !!v.checked })}
+                      aria-label={'Toevoegen: ' + (b.onderwerp || 'geen onderwerp')}
+                    />
+                    <div className={s.kandidaatTekst}>
+                      <div className={s.naam}>{wie(b)}</div>
+                      <div className={s.meta}>
+                        {(b.ontvangenOp ? datumTijd(b.ontvangenOp) + ' · ' : '') + (b.onderwerp || '(geen onderwerp)')}
+                      </div>
+                      {b.voorbeeld && <div className={s.voorbeeld}>{b.voorbeeld}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => props.onSluit(false)} disabled={bezig}>
+              {gevonden && gevonden.length === 0 ? 'Sluiten' : 'Annuleren'}
+            </Button>
+            {gevonden && gevonden.length > 0 && (
+              <Button appearance="primary" disabled={bezig || teKiezen.length === 0} onClick={voegToe}>
+                {bezig ? 'Toevoegen…' : 'Toevoegen (' + teKiezen.length + ')'}
+              </Button>
+            )}
+          </DialogActions>
+        </DialogBody>
+      </DialogSurface>
+    </Dialog>
+  );
+}
+
 function AntwoordPaneel(props: { aanvraag: Aanvraag; laatsteInkomend?: Bericht; onVerzonden: () => void; onSluit: () => void }): JSX.Element {
   const d = useDiensten();
   const s = useStijl();
@@ -292,6 +399,7 @@ export function Conversatie(props: {
   const melding = useMelding();
   const [antwoorden, setAntwoorden] = React.useState(false);
   const [verplaats, setVerplaats] = React.useState<Bericht | undefined>();
+  const [ophalen, setOphalen] = React.useState(false);
   const verrijkt = React.useRef<Record<number, boolean>>({});
 
   const inkomend = props.berichten.filter(b => b.richting === 'Inkomend');
@@ -369,8 +477,21 @@ export function Conversatie(props: {
           <Button appearance="primary" icon={laatsteInkomend ? <ArrowReplyAllRegular /> : <MailRegular />} onClick={() => setAntwoorden(true)}>
             {laatsteInkomend ? 'Antwoorden' : 'E-mail versturen'}
           </Button>
+          <Button icon={<ArrowSyncRegular />} onClick={() => setOphalen(true)}>
+            Berichten ophalen
+          </Button>
         </div>
       )}
+
+      <OphaalDialoog
+        open={ophalen}
+        aanvraag={props.aanvraag}
+        berichten={props.berichten}
+        onSluit={toegevoegd => {
+          setOphalen(false);
+          if (toegevoegd) props.herlaad().catch(() => undefined);
+        }}
+      />
 
       <VerplaatsDialoog
         bericht={verplaats}
